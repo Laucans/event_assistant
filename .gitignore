@@ -34,5 +34,8 @@ coverage/
 # claude
 .claude/settings.local.json
 
+# local agent bookkeeping (running-process ledger, scratch)
+.llocal/
+
 # human-action tracking copy — live state + personal notes, never committed
 docs/current/HUMAN_ACTION_TRACKING.md

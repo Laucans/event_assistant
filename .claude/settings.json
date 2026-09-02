@@ -25,5 +25,17 @@
       "Read(~/.config/**)"
     ]
   },
-  "hooks": {}
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 5,
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-.}/.llocal/running_process/PROCESSES.md\"; [ -f \"$f\" ] || exit 0; a=\"\"; for p in $(sed -n 's/^- pid: \\([0-9][0-9]*\\).*/\\1/p' \"$f\"); do kill -0 \"$p\" 2>/dev/null && a=\"$a $p\"; done; [ -n \"$a\" ] && printf '{\"systemMessage\":\"Background processes from this session are still alive (pid:%s). Stop them (see kill: in .llocal/running_process/PROCESSES.md) or delete the stale entry.\"}\\n' \"$a\"; exit 0"
+          }
+        ]
+      }
+    ]
+  }
 }

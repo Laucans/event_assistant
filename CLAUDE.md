@@ -77,6 +77,13 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 - Write a failing test before fixing a bug where practical.
 - Verification means a pass/fail signal with output shown — not "looks
   done" (§1).
+- **Track background processes.** Anything still running after a tool call
+  returns (background Bash, dev servers, watchers, tunnels) gets an entry
+  appended to `.llocal/running_process/PROCESSES.md` in that file's documented
+  format (create the dir/file if missing), deleted once the process is stopped.
+  `kill:` must name every process that has to die, not just the parent
+  (`npm run dev` leaves a `next dev` child holding port 3000) — never track a
+  port-holding server by its parent pid alone.
 
 ## Repository etiquette
 
