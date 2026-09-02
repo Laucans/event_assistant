@@ -29,6 +29,7 @@ Create well-formatted git commits following conventional commit standards.
 - refactor: Code refactoring
 - test: Adding or modifying tests
 - chore: Maintenance tasks
+- AIchore: ai workflow maintenance tasks
 
 ## Example Output
 ```
