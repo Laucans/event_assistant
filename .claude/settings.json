@@ -26,6 +26,18 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 5,
+            "command": "python3 -c 'import sys,json,re\ntry:\n    d=json.load(sys.stdin)\n    t=d.get(\"tool_name\") or \"\"\n    i=d.get(\"tool_input\") or {}\n    s=i.get(\"command\") if t==\"Bash\" else i.get(\"file_path\")\n    p=r\"(?:/private)?/tmp/claude-[^\\s\\\"|;]*?scratchpad\"\n    m=re.search(p+r\"([^\\s\\\"|;]*)\",s or \"\")\n    if m:\n        if t==\"Bash\":\n            c=\" \".join(re.sub(p,\".../scratchpad\",s).split())\n            v=c[:80]+(\"...\" if len(c)>80 else \"\")\n        else:\n            v=\"...\"+m.group(1) if m.group(1).strip(\"/\") else \".../scratchpad\"\n        print(json.dumps({\"systemMessage\":\"scratchpad: \"+t+\" \"+v}))\nexcept Exception:\n    pass\n' 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
