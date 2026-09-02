@@ -5,8 +5,9 @@ else in `docs/current/SPEC.md` is Claude's to execute.
 
 Rationale, guidance, progress ticks and your own notes live in
 `docs/current/HUMAN_ACTION_TRACKING.md` (gitignored). This file stays a clean,
-unchecked list — it is archived next to the spec in
-`docs/current/spec_archive/` when the spec is replaced.
+unchecked list — when the task is finished `/archive-instructions` moves it,
+next to the spec, into
+`docs/archives/milestones/<NN>_<milestone-slug>/<N>_<task-slug>/`.
 
 ---
 

@@ -130,8 +130,7 @@ human-only)_
 - Run `/code-review` (or a fresh subagent) against the full diff with
   SPEC.md as the checklist: every goal implemented, `.env.local` never
   committed, no secrets in the diff, CI genuinely catches failures.
-- Manually flip `docs/ROADMAP.md`'s checkbox context if needed — it's
-  currently already `[x]`, so just confirm it still reads correctly
+- Manually flip `docs/ROADMAP.md`'s checkbox context if needed, so just confirm it still reads correctly
   once this work is real.
 
 ## Files & interfaces touched

@@ -14,8 +14,10 @@ produce three documents:
   the human-only actions: the same items with their rationale, the "not
   needed yet" table, and room for the human's ticks and notes.
 - `docs/current/HUMAN_ACTION.md` — the committed short list of those same
-  actions, unchecked and one line each; it is archived next to the spec in
-  `docs/current/spec_archive/` when the spec is replaced.
+  actions, unchecked and one line each; when the task is finished it is
+  archived next to the spec under
+  `docs/archives/milestones/<NN>_<milestone-slug>/<N>_<task-slug>/`. That
+  move is `/archive-instructions`' job, not yours.
 
 You produce documents. You do **not** implement. Work in plan mode if it's
 available.

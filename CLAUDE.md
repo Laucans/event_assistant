@@ -61,9 +61,10 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 
 - Docs pipeline: `docs/PROJECT.md` + `docs/ARCHITECTURE.md` →
   `docs/ROADMAP.md` → `docs/current/CURRENT_MILESTONE.md` →
-  `docs/current/SPEC.md` → implement.
+  `docs/current/SPEC.md` → implement → `/archive-instructions`.
 - `/planner` writes a milestone, `/analyst` writes a SPEC, `/code-review`
-  runs before calling work done. Implementing a SPEC is a normal session —
+  runs before calling work done, `/archive-instructions` files the finished
+  spec under `docs/archives/`. Implementing a SPEC is a normal session —
   `/clear` first.
 - Changes to `CLAUDE.md`, `.claude/skills/`, `.claude/agents/` or
   `.claude/settings.json` go through the `vibe-specialist` subagent.
