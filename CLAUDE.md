@@ -67,8 +67,11 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
   `/clear` first.
 - Changes to `CLAUDE.md`, `.claude/skills/`, `.claude/agents/` or
   `.claude/settings.json` go through the `vibe-specialist` subagent.
-- `docs/current/HUMAN_ACTION.md` holds the steps only the human can do for
-  the current SPEC. Check it before claiming to be blocked.
+- Human-only steps for the current SPEC live in two files:
+  `docs/current/HUMAN_ACTION.md` is the committed short list, archived with
+  the spec; `docs/current/HUMAN_ACTION_TRACKING.md` is the gitignored working
+  copy carrying the rationale, the live ticks and the human's notes. Read the
+  tracking file before claiming to be blocked, and put ticks only there.
 - Explore and plan before implementing anything touching more than one file
   (`Human_guidelines.md` §1).
 - Write a failing test before fixing a bug where practical.

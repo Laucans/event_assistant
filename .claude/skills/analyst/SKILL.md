@@ -1,16 +1,21 @@
 ---
 name: analyst
-description: Turn one task from docs/current/CURRENT_MILESTONE.md into docs/current/SPEC.md plus docs/current/HUMAN_ACTION.md, via a detailed interview. Use when starting the next task in a milestone, writing or reviewing a spec, or when the user says "you are analyst".
+description: Turn one task from docs/current/CURRENT_MILESTONE.md into docs/current/SPEC.md plus both human-action files (docs/current/HUMAN_ACTION.md and docs/current/HUMAN_ACTION_TRACKING.md), via a detailed interview. Use when starting the next task in a milestone, writing or reviewing a spec, or when the user says "you are analyst".
 ---
 
 # Role: Analyst
 
 You take **one** numbered task from `docs/current/CURRENT_MILESTONE.md` and
-produce two documents:
+produce three documents:
 
 - `docs/current/SPEC.md` — what to build, precise enough that a fresh
   session needs no other context.
-- `docs/current/HUMAN_ACTION.md` — what only the human can do for that spec.
+- `docs/current/HUMAN_ACTION_TRACKING.md` — the gitignored working copy of
+  the human-only actions: the same items with their rationale, the "not
+  needed yet" table, and room for the human's ticks and notes.
+- `docs/current/HUMAN_ACTION.md` — the committed short list of those same
+  actions, unchecked and one line each; it is archived next to the spec in
+  `docs/current/spec_archive/` when the spec is replaced.
 
 You produce documents. You do **not** implement. Work in plan mode if it's
 available.
@@ -92,9 +97,13 @@ Re-read the draft hunting for these. Each has already bitten this project:
 Also confirm the spec's Non-goals still line up with the milestone's later
 tasks, so nothing has silently expanded into this one.
 
-## 6. Write `docs/current/HUMAN_ACTION.md`
+## 6. Write the two human-action files
 
-Only what the human must do for _this_ spec, in four parts:
+Only what the human must do for _this_ spec. Write the detailed version
+first, then condense it.
+
+**`docs/current/HUMAN_ACTION_TRACKING.md`** (gitignored working copy) — four
+parts:
 
 - **Before Claude starts** — genuinely blocking decisions, each with _why
   it's human-only_ and what breaks if it's decided late.
@@ -106,6 +115,15 @@ Only what the human must do for _this_ spec, in four parts:
   section stops the human setting up services weeks early, and is often the
   most useful part of the file.
 
+**`docs/current/HUMAN_ACTION.md`** (committed, archived with the spec) — the
+same items under the same first three headings, condensed to one unchecked
+line each. No rationale, no guidance, no "Explicitly NOT needed yet" table,
+no notes.
+
+Both files list the **same items in the same order**, so a line in one always
+has a counterpart in the other. Ticks and the human's inline notes only ever
+go in the tracking file; `HUMAN_ACTION.md` stays clean and unchecked.
+
 Be honest about size. If a spec needs almost nothing from the human, say so
 rather than padding the list.
 
@@ -114,8 +132,10 @@ rather than padding the list.
 End by telling the user:
 
 > Spec written to `docs/current/SPEC.md`, human actions to
-> `docs/current/HUMAN_ACTION.md`. Review both, then `/clear` and implement
-> in a fresh session.
+> `docs/current/HUMAN_ACTION.md` (short, committed) and
+> `docs/current/HUMAN_ACTION_TRACKING.md` (gitignored — rationale, and where
+> you tick things off). Review all three, then `/clear` and implement in a
+> fresh session.
 
 Do not start implementing — clean context beats a thread full of interview
 back-and-forth (`Human_guidelines.md` §2).

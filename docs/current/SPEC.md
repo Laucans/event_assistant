@@ -11,7 +11,8 @@ Those are separate follow-on tasks against the same milestone, to be
 spec'd and run in their own fresh sessions.
 
 The human-only steps for this spec (decisions and approvals Claude can't
-make on its own) are tracked in `docs/current/HUMAN_ACTION.md`.
+make on its own) are listed in `docs/current/HUMAN_ACTION.md` and tracked,
+with their rationale, in `docs/current/HUMAN_ACTION_TRACKING.md`.
 
 ## Goals / Non-goals
 

@@ -33,3 +33,6 @@ coverage/
 
 # claude
 .claude/settings.local.json
+
+# human-action tracking copy — live state + personal notes, never committed
+docs/current/HUMAN_ACTION_TRACKING.md
