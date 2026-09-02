@@ -30,12 +30,12 @@ is short. **No accounts need creating and nothing needs paying for.**
 
 ## While Claude works
 
-- [ ] **Approve the permission prompts** as they appear (unless you did the
+- [x] **Approve the permission prompts** as they appear (unless you did the
       step above). Nothing here is destructive — the one deletion is
       `read-docs-spec-md-and-tell-zazzy-wind.md`, a superseded plan file,
       removed before git is initialized.
 
-- [ ] **Watch for the non-empty-directory step.** `create-next-app` may
+- [x] **Watch for the non-empty-directory step.** `create-next-app` may
       refuse to scaffold over the existing `docs/`, `src/`, `tests/`, and
       root markdown files. The spec's fallback is to scaffold into a temp dir
       and merge by hand. If you're asked to choose, **never accept an
@@ -44,7 +44,7 @@ is short. **No accounts need creating and nothing needs paying for.**
 
 ## Before calling it done
 
-- [ ] **Open `http://localhost:3000` yourself** once `npm run dev` is up.
+- [x] **Open `http://localhost:3000` yourself** once `npm run dev` is up.
       Claude can confirm the server responds; only you can confirm the page
       looks right.
 
