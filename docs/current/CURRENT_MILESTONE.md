@@ -66,7 +66,8 @@ proven foundation instead of also having to stand up plumbing.
 
 # Tasks
 
-**1. Repo & app scaffold**
+**1. Repo & app scaffold** — ✅ DONE
+([archive](../archives/milestones/01_initial-architecture-setup/1_repo-app-scaffold/))
 
 - `git init`, verify `.gitignore` already excludes `node_modules` and
   `.env.local` _before_ the first commit.
