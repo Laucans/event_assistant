@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+build/
+coverage/
+package-lock.json
+next-env.d.ts
+
+# Hand-authored docs (CLAUDE.md, Human_guidelines.md, docs/, .claude/skills/).
+# Prettier owns code formatting only; prose stays as written.
+*.md
+
+# Claude Code tooling config — edited via the vibe-specialist subagent.
+.claude/
