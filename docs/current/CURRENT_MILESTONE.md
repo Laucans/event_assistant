@@ -79,7 +79,8 @@ proven foundation instead of also having to stand up plumbing.
   `npm test` all pass locally.
 
 **2. GitHub repo & CI** _(needs you: `gh auth login` first — human-only,
-can't be scripted)_
+can't be scripted)_ — ✅ DONE
+([archive](../archives/milestones/01_initial-architecture-setup/2_github-repo-ci/))
 
 - You run `gh auth login` interactively.
 - Claude: initial commit, `gh repo create`, push, add
