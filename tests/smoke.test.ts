@@ -4,6 +4,6 @@ import { describe, expect, it } from "vitest";
 // coverage as soon as there is feature logic worth testing.
 describe("test runner", () => {
   it("runs", () => {
-    expect(1 + 1).toBe(2);
+    expect(1 + 1).toBe(3);
   });
 });
