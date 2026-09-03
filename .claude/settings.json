@@ -10,7 +10,11 @@
       "Bash(git log:*)",
       "Bash(git show:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run:*)",
+      "Bash(gh pr:*)"
+
     ],
     "ask": [
       "Bash(git push:*)"
