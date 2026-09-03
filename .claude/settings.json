@@ -14,7 +14,6 @@
       "Bash(gh api:*)",
       "Bash(gh run:*)",
       "Bash(gh pr:*)"
-
     ],
     "ask": [
       "Bash(git push:*)"
@@ -38,6 +37,16 @@
             "type": "command",
             "timeout": 5,
             "command": "python3 -c 'import sys,json,re\ntry:\n    d=json.load(sys.stdin)\n    t=d.get(\"tool_name\") or \"\"\n    i=d.get(\"tool_input\") or {}\n    s=i.get(\"command\") if t==\"Bash\" else i.get(\"file_path\")\n    p=r\"(?:/private)?/tmp/claude-[^\\s\\\"|;]*?scratchpad\"\n    m=re.search(p+r\"([^\\s\\\"|;]*)\",s or \"\")\n    if m:\n        if t==\"Bash\":\n            c=\" \".join(re.sub(p,\".../scratchpad\",s).split())\n            v=c[:80]+(\"...\" if len(c)>80 else \"\")\n        else:\n            v=\"...\"+m.group(1) if m.group(1).strip(\"/\") else \".../scratchpad\"\n        print(json.dumps({\"systemMessage\":\"scratchpad: \"+t+\" \"+v}))\nexcept Exception:\n    pass\n' 2>/dev/null; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python3 -c 'import sys,json,re,shlex,os,subprocess\ndef cur():\n    d=os.environ.get(\"CLAUDE_PROJECT_DIR\") or \".\"\n    try:\n        return subprocess.run([\"git\",\"-C\",d,\"symbolic-ref\",\"--short\",\"HEAD\"],capture_output=True,text=True,timeout=3).stdout.strip()\n    except Exception:\n        return \"\"\ntry:\n    data=json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\nif (data.get(\"tool_name\") or \"\")!=\"Bash\":\n    sys.exit(0)\ncmd=(data.get(\"tool_input\") or {}).get(\"command\") or \"\"\nhit=False\nfor seg in re.split(r\"[;|&\\n]\",cmd):\n    try:\n        toks=shlex.split(seg)\n    except Exception:\n        toks=seg.split()\n    g=0\n    while g<len(toks) and (re.match(r\"^[A-Za-z_][A-Za-z_0-9]*=\",toks[g]) or toks[g] in (\"sudo\",\"env\",\"command\",\"time\",\"nohup\")):\n        g+=1\n    if g>=len(toks) or not (toks[g]==\"git\" or toks[g].endswith(\"/git\")):\n        continue\n    j=g+1\n    while j<len(toks):\n        if toks[j] in (\"-C\",\"-c\",\"--git-dir\",\"--work-tree\",\"--namespace\",\"--exec-path\"):\n            j+=2\n        elif toks[j].startswith(\"-\"):\n            j+=1\n        else:\n            break\n    if j>=len(toks) or toks[j]!=\"push\":\n        continue\n    pos=[t for t in toks[j+1:] if not t.startswith(\"-\")]\n    if len(pos)<2:\n        if cur()==\"main\":\n            hit=True\n    else:\n        for r in pos[1:]:\n            d=re.sub(r\"^refs/heads/\",\"\",r.split(\":\")[-1].lstrip(\"+\"))\n            if d in (\"HEAD\",\"@\"):\n                d=cur()\n            if d==\"main\":\n                hit=True\nif hit:\n    sys.stderr.write(\"Blocked: never push to main directly (CLAUDE.md, Repository etiquette). Admin bypass means the push would succeed. Instead: git switch -c <type>/<slug>, push that branch, gh pr create, then gh pr merge --rebase once ci is green.\")\n    sys.exit(2)\nsys.exit(0)\n'"
           }
         ]
       }
