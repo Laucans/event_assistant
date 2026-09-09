@@ -344,6 +344,13 @@ instead of guessing."
 
   # /analyst has just written the tracking file for THIS task, so this is
   # the first moment its blocking items are the right ones to read.
+  #
+  # An absent file is not an absent blocker: it is gitignored, so a fresh
+  # clone has none, and reading no items out of it would let the loop build
+  # straight through prerequisites nobody has done.
+  if [ ! -f "$TRACKING" ]; then
+    halt "cannot check the blocking human actions — $TRACKING is absent (gitignored, and written by /analyst). Run /analyst for task $num, or restore the file, before letting the loop build."
+  fi
   blocked=$(open_human_actions)
   if [ -n "$blocked" ]; then
     log "open items under 'Before Claude starts':"
@@ -355,7 +362,13 @@ instead of guessing."
   stage_enabled create-test && run_stage_once create-test
 
   if stage_enabled archive-instructions; then
-    run_stage_once archive-instructions "Archive task $num (\"$title\") only."
+    # Deliberately run_stage, not run_stage_once. Archiving is the last
+    # stage, and its post-conditions below are what say it worked: marking
+    # it done before checking them would let a failed archive be skipped on
+    # every re-run, halting on the same post-condition forever. When it does
+    # succeed the task closes and the whole record is cleared, so there is no
+    # resume case for it to miss.
+    run_stage archive-instructions "Archive task $num (\"$title\") only."
     [ -f "$SPEC" ] && halt "/archive-instructions left $SPEC in place — the task did not close"
     [ "$(count_done)" -gt "$before" ] \
       || halt "round $round moved no task to DONE in $MILESTONE — stopping rather than looping on the same task"
