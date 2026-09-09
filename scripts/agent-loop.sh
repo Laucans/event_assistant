@@ -105,7 +105,9 @@ tasks_todo() { milestone_tasks | awk -F'\t' '$2 == "todo"'; }
 count_done() { milestone_tasks | awk -F'\t' '$2 == "done"' | wc -l | tr -d ' '; }
 
 # Unticked items under "Before Claude starts" — the ones /code treats as
-# blocking by construction. Read-only: the ticks belong to the human.
+# blocking by construction. Items the analyst marked (Optional) are advice,
+# not prerequisites, so they do not block. Read-only: the ticks are the
+# human's to write.
 open_human_actions() {
   [ -f "$TRACKING" ] || return 0
   python3 - "$TRACKING" <<'PY'
@@ -115,8 +117,8 @@ txt = open(sys.argv[1], encoding='utf-8').read()
 m = re.search(r'^##\s+Before Claude starts\s*$(.*?)(?=^##\s|\Z)', txt, re.M | re.S)
 for line in (m.group(1) if m else '').splitlines():
     s = line.strip()
-    if s.startswith('- [ ]'):
-        print(re.sub(r'\*+', '', s[5:]).strip())
+    if s.startswith('- [ ]') and not re.search(r'\(optional\)', s, re.I):
+        print(re.sub(r'[*_]+', '', s[5:]).strip())
 PY
 }
 
@@ -241,8 +243,11 @@ what is missing rather than planning on top of it."
   IFS=$'\t' read -r num _state kind title <<< "${todo%%$'\n'*}"
   log "round $round/$MAX_ROUNDS — task $num: $title [$kind]"
 
+  # `needs you` says the task has human prerequisites, not that it can never
+  # run. The ticks in the tracking file are the gate, and they are checked
+  # below — once /analyst has written the list for THIS task.
   if [ "$kind" = human ]; then
-    halt "task $num ($title) is marked 'needs you' in $MILESTONE — it needs an account or a browser flow only you can do"
+    log "task $num is marked 'needs you' — the ticks in $TRACKING decide, not the marker"
   fi
 
   before=$(count_done)
