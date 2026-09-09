@@ -89,9 +89,10 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 ## Repository etiquette
 
 - Branch `main`. This machine's git default is `master`, so init explicitly.
-- **IMPORTANT: never push to `main` directly.** Admin bypass means
-  `git push origin main` still succeeds; the ruleset is a backstop, not the
-  enforcement. Branch → PR → merge, every task, no exceptions.
+- **IMPORTANT: never push to `main` directly.** Admin bypass and GitHub's
+  ruleset are both backstops; the `PreToolUse` hook in
+  `.claude/settings.json` is the enforcement, which is why `git push` is
+  allowlisted rather than prompted. Branch → PR → merge, no exceptions.
 - Branch `<type>/<slug>`, type from the commit types in
   `.claude/skills/commit/SKILL.md` (`feat`, `fix`, `docs`, `style`,
   `refactor`, `test`, `chore`, `AIchore`).

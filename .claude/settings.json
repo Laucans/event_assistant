@@ -20,13 +20,12 @@
       "Bash(git show:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
+      "Bash(git push:*)",
       "Bash(gh api:*)",
       "Bash(gh run:*)",
       "Bash(gh pr:*)"
     ],
-    "ask": [
-      "Bash(git push:*)"
-    ],
+    "ask": [],
     "deny": [
       "Read(./.env)",
       "Read(./.env.local)",
