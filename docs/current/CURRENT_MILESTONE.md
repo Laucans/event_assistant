@@ -91,8 +91,8 @@ can't be scripted)_ — ✅ DONE
   verifying it _fails_ appropriately too (e.g. temporarily break lint,
   confirm red, revert).
 
-**3. Supabase account & connection** _(needs you: account/project creation
-in-browser — human-only)_
+**3. Supabase account & connection** — ✅ DONE
+([archive](../archives/milestones/01_initial-architecture-setup/3_supabase-account-connection/))
 
 - Claude walks you through creating the Supabase account/project and
   grabbing the connection string/keys.
