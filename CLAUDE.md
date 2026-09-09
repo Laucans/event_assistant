@@ -56,6 +56,15 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 - **Single admin**, one env-configured credential. No roles/permissions
   system.
 - **Montreal-only for v1, multi-city schema.** Don't hardcode the city.
+- **`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is public by design** and ships
+  to the browser, so what protects data is row-level security, not the key.
+  Every table gets RLS enabled **at creation**, with an explicit policy —
+  never a table without one. Reads of public data use the publishable key;
+  writes use the secret key, server-side only.
+- **`SUPABASE_SECRET_KEY` bypasses RLS** and must never gain a
+  `NEXT_PUBLIC_` prefix — Next.js inlines every `NEXT_PUBLIC_` variable into
+  the client bundle at build time, publishing an RLS-bypassing credential to
+  every visitor.
 
 ## Workflow
 
