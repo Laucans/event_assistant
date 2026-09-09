@@ -25,6 +25,32 @@ if (!url) fail(`NEXT_PUBLIC_SUPABASE_URL ${missing}`);
 if (!publishableKey) fail(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ${missing}`);
 if (!secretKey) fail(`SUPABASE_SECRET_KEY ${missing}`);
 
+// Both key types authenticate against the probes below, so reachability alone
+// cannot tell them apart: a secret key pasted into the NEXT_PUBLIC_ variable
+// would pass every check here and then be inlined into the browser bundle by
+// `next build`, publishing an RLS-bypassing credential. Assert the type.
+// Legacy anon / service_role JWTs (they start "eyJ") are rejected the same
+// way — Supabase retires them at the end of 2026.
+function requireKeyType(name: string, value: string, prefix: string): void {
+  if (value.startsWith(prefix)) return;
+  fail(
+    value.startsWith("eyJ")
+      ? `${name} holds a legacy JWT — this project uses the opaque ${prefix}… keys from Settings -> API Keys`
+      : `${name} does not look like a ${prefix}… key`
+  );
+}
+
+requireKeyType(
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  publishableKey,
+  "sb_publishable_"
+);
+requireKeyType("SUPABASE_SECRET_KEY", secretKey, "sb_secret_");
+
+// Trailing slashes are easy to paste in and would produce "//rest/v1/", whose
+// 404 looks like a dead project rather than a malformed URL.
+const baseUrl = url.replace(/\/+$/, "");
+
 // Probe A — authentication and reachability.
 //
 // The two key types do not answer to the same endpoint. The secret key can
@@ -46,12 +72,12 @@ async function get(
   label: string
 ): Promise<Response> {
   try {
-    return await fetch(`${url}${path}`, {
+    return await fetch(`${baseUrl}${path}`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    fail(`${label}: could not reach ${url} — ${reason}`);
+    fail(`${label}: could not reach ${baseUrl} — ${reason}`);
   }
 }
 
