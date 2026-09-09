@@ -2,9 +2,11 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, main_agent]
   pull_request:
-    branches: [main]
+    # main_agent is the integration branch scripts/agent-loop.sh merges into;
+    # without it here those PRs get no check and `gh pr checks` never resolves.
+    branches: [main, main_agent]
 
 jobs:
   ci:
