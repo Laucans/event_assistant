@@ -1,6 +1,15 @@
 {
   "permissions": {
     "allow": [
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(wc:*)",
+      "Bash(echo:*)",
       "Bash(npm run:*)",
       "Bash(npm test:*)",
       "Bash(npm ci)",
@@ -47,6 +56,16 @@
             "type": "command",
             "timeout": 10,
             "command": "python3 -c 'import sys,json,re,shlex,os,subprocess\ndef cur():\n    d=os.environ.get(\"CLAUDE_PROJECT_DIR\") or \".\"\n    try:\n        return subprocess.run([\"git\",\"-C\",d,\"symbolic-ref\",\"--short\",\"HEAD\"],capture_output=True,text=True,timeout=3).stdout.strip()\n    except Exception:\n        return \"\"\ntry:\n    data=json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\nif (data.get(\"tool_name\") or \"\")!=\"Bash\":\n    sys.exit(0)\ncmd=(data.get(\"tool_input\") or {}).get(\"command\") or \"\"\nhit=False\nfor seg in re.split(r\"[;|&\\n]\",cmd):\n    try:\n        toks=shlex.split(seg)\n    except Exception:\n        toks=seg.split()\n    g=0\n    while g<len(toks) and (re.match(r\"^[A-Za-z_][A-Za-z_0-9]*=\",toks[g]) or toks[g] in (\"sudo\",\"env\",\"command\",\"time\",\"nohup\")):\n        g+=1\n    if g>=len(toks) or not (toks[g]==\"git\" or toks[g].endswith(\"/git\")):\n        continue\n    j=g+1\n    while j<len(toks):\n        if toks[j] in (\"-C\",\"-c\",\"--git-dir\",\"--work-tree\",\"--namespace\",\"--exec-path\"):\n            j+=2\n        elif toks[j].startswith(\"-\"):\n            j+=1\n        else:\n            break\n    if j>=len(toks) or toks[j]!=\"push\":\n        continue\n    pos=[t for t in toks[j+1:] if not t.startswith(\"-\")]\n    if len(pos)<2:\n        if cur()==\"main\":\n            hit=True\n    else:\n        for r in pos[1:]:\n            d=re.sub(r\"^refs/heads/\",\"\",r.split(\":\")[-1].lstrip(\"+\"))\n            if d in (\"HEAD\",\"@\"):\n                d=cur()\n            if d==\"main\":\n                hit=True\nif hit:\n    sys.stderr.write(\"Blocked: never push to main directly (CLAUDE.md, Repository etiquette). Admin bypass means the push would succeed. Instead: git switch -c <type>/<slug>, push that branch, gh pr create, then gh pr merge --rebase once ci is green.\")\n    sys.exit(2)\nsys.exit(0)\n'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python3 -c 'import sys,json,re,shlex,os\ntry:\n    data=json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\nif (data.get(\"tool_name\") or \"\")!=\"Bash\":\n    sys.exit(0)\ncmd=(data.get(\"tool_input\") or {}).get(\"command\") or \"\"\nhome=os.path.expanduser(\"~\")\nQ=chr(34)+chr(39)\nOK=(\".env.example\",\".env.sample\",\".env.template\")\ndef bad(tok):\n    t=tok.strip(Q)\n    if not t:\n        return \"\"\n    t=re.sub(r\"^(~|\\$HOME|\\$\\{HOME\\})(?=/|$)\",home,t)\n    p=t\n    while p.startswith(\"./\"):\n        p=p[2:]\n    parts=[x for x in p.split(\"/\") if x and x!=\".\"]\n    if not parts:\n        return \"\"\n    b=parts[-1]\n    if b==\".env\" or (b.startswith(\".env.\") and b not in OK):\n        return t\n    if \"secrets\" in parts[:-1]:\n        return t\n    if t.startswith(\"/\"):\n        for d in (\".ssh\",\".aws\",\".config\"):\n            if t.startswith(home+\"/\"+d+\"/\"):\n                return t\n    return \"\"\nfor seg in re.split(r\"[;|&\\n]\",cmd):\n    try:\n        toks=shlex.split(seg)\n    except Exception:\n        toks=seg.split()\n    for tok in toks:\n        h=bad(tok)\n        if h:\n            sys.stderr.write(\"Blocked: \"+h+\" is a secret path. permissions.deny in .claude/settings.json blocks the Read tool on .env/.env.*/secrets/**/~/.ssh/~/.aws/~/.config, and this Bash command would read the same secrets around that rule. If you only need to know which variables exist, read .env.example instead.\")\n            sys.exit(2)\nsys.exit(0)\n'"
           }
         ]
       }
