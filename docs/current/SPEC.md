@@ -50,7 +50,9 @@ rationale and your ticks in `docs/current/HUMAN_ACTION_TRACKING.md`.
 - A Supabase project created in **`ca-central-1` (Montreal)** — same region as
   the data and as the machine that will run the nightly scraper. The region is
   fixed at creation; changing it later means recreating the project.
-- `@supabase/supabase-js` (2.115.0) added as the single database dependency.
+- `@supabase/supabase-js` (`^2.116.0` — `2.115.0` when this spec was written,
+  superseded by the time `npm install` ran) added as the single database
+  dependency.
   The app talks to Postgres over HTTPS/PostgREST — **no connection string, no
   `DATABASE_URL`, no pooler hostname anywhere in this task.**
 - `.env.example` updated to the current key names
@@ -176,13 +178,31 @@ rationale and your ticks in `docs/current/HUMAN_ACTION_TRACKING.md`.
 
 7. **Write `scripts/check-db.mts`.** Two probes, in this order:
 
-   - **Probe A — authentication and reachability** (must pass). For each key
-     in turn, `fetch(`${url}/rest/v1/`, { headers: { apikey: key,
-     Authorization: `Bearer ${key}` } })` and require HTTP **200**. This
-     endpoint returns PostgREST's OpenAPI description and needs **no tables**,
-     so it is a definitive credential check before any schema exists. A `401`
-     means the key is wrong; a DNS/connect failure means the URL is wrong or
-     the project is paused.
+   - **Probe A — authentication and reachability** (must pass). One probe per
+     key, because the two key types do not answer to the same endpoint —
+     **corrected during implementation: a single shared endpoint, as this step
+     originally demanded, is factually wrong. Both branches below were verified
+     empirically.**
+
+     The **secret** key reads PostgREST's OpenAPI root: `fetch(
+     `${url}/rest/v1/`, { headers: { apikey: key, Authorization: `Bearer
+     ${key}` } })` must return HTTP **200**. That endpoint needs **no tables**,
+     so it is a definitive credential check before any schema exists.
+
+     The **publishable** key is rejected there — Supabase answers `401 "Only
+     secret API keys can be used for this endpoint."` — so it is probed against
+     a table path instead, where a *missing table* (`404` with PostgREST code
+     `PGRST205` or `42P01`) still proves the key authenticated; an invalid key
+     never gets that far, it is turned away with `401 "Invalid API key"`. Point
+     it at a name **no migration will ever create**
+     (`__connectivity_probe__`), not at `cities`: a real table would make the
+     check mean one thing before its migration (404) and another after (200),
+     and a `200` with zero rows — what RLS returns on a table with no read
+     policy — would pass for the same reason as the 404. Require the
+     missing-table 404 and nothing else.
+
+     A `401` means the key is wrong; a DNS/connect failure means the URL is
+     wrong or the project is paused.
    - **Probe B — schema state** (informational until task 4). Call
      `serviceClient().from("cities").select("*").limit(1)`. Three outcomes:
      no error → print the row count; an error meaning *the table does not
@@ -214,11 +234,16 @@ rationale and your ticks in `docs/current/HUMAN_ACTION_TRACKING.md`.
 9. **Add the npm script.**
 
    ```json
-   "db:check": "node --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-db.mts"
+   "db:check": "node --env-file-if-exists=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-db.mts"
    ```
 
-   `--env-file` is native to Node 24 (no `dotenv` dependency) and fails loudly
-   if `.env.local` is missing, which is the right behaviour. The
+   `--env-file-if-exists` is native to Node 24 (no `dotenv` dependency). Use
+   the `-if-exists` form, **not** `--env-file`: the plain flag makes Node exit
+   **9** with `node: .env.local: not found` before the script runs a single line,
+   so the script's own `FAIL  NEXT_PUBLIC_SUPABASE_URL is not set — copy
+   .env.example and fill it in` would be unreachable on exactly the fresh-clone
+   path it exists for, and the exit code would not be the **1** the red proof
+   expects. Let the script do the complaining. The
    `--disable-warning` flag suppresses `MODULE_TYPELESS_PACKAGE_JSON`, which
    Node otherwise prints for the imported `.ts` module on every run —
    **verified**; without it the script's output is buried in warning text.
@@ -284,7 +309,9 @@ Untouched, stated so a broad `git add` is not tempted: `.claude/settings.json`
   themselves hunting for a `DATABASE_URL`, they have left this spec's design.
 - **There are no tables yet**, so Probe B *should* report a missing `cities`
   table. That is a pass, not a failure. A check that demanded a table would be
-  unrunnable until task 4 lands.
+  unrunnable until task 4 lands. Probe A's own table is a different matter: it
+  is a name that never exists, so its missing-table 404 stays the expected
+  answer forever and the probe keeps one meaning either side of task 4.
 - **Missing-table error codes differ by PostgREST version** (`42P01` vs
   `PGRST205`). Match on either; never on one.
 - **A `.ts` entry point runs as CommonJS** because `package.json` has no
@@ -337,18 +364,38 @@ Every bullet below is a command with a pass/fail result.
 - `npm run lint`, `npm run format:check`, `npm run typecheck`,
   `npm run build`, and `npm test` all pass locally after the `tsconfig.json`
   change.
-- `git grep -n "SUPABASE_ANON_KEY\|SERVICE_ROLE"` returns **nothing** —
-  the legacy names are gone from the whole tree.
-- `git grep -n "sb_secret_"` returns **nothing** — no real key literal was
-  committed anywhere.
+- `git grep -n "SUPABASE_ANON_KEY\|SERVICE_ROLE" -- ':(exclude)docs/'`
+  returns **nothing** — the legacy names are gone from the code and config.
+  `docs/` is excluded because this spec *names* both variables (in the
+  Problem and Goals sections) to explain why they are being retired; an
+  unscoped grep therefore reports its own prose and can never come back empty.
+- `git grep -nE "sb_(secret|publishable)_[A-Za-z0-9_-]{20,}"` returns
+  **nothing** — no real key literal was committed anywhere. Match on key-shaped
+  *material*, not on the bare prefix: `.env.example` documents
+  `SUPABASE_SECRET_KEY=sb_secret_…` by design (spec step 4) and step 10's red
+  proof uses `sb_secret_bogus`, so `git grep "sb_secret_"` is expected to hit
+  and proves nothing. Real keys run far longer than 20 characters.
 - `git check-ignore -v .env.local` prints a `.gitignore` match, and
   `git log --all --oneline -- .env.local` is **empty**.
-- `npm ls @supabase/supabase-js` reports `2.115.0` and
-  `git diff main --stat` on the PR lists **only**: `package.json`,
+- `npm ls @supabase/supabase-js` reports **`2.116.0`** (`^2.116.0` in
+  `package.json`; `2.115.0` was current when this spec was written and had
+  been superseded by install time — the exact pin was not worth holding for a
+  patch release).
+- `git diff origin/main_agent...HEAD --stat` lists **only**: `package.json`,
   `package-lock.json`, `.env.example`, `src/lib/db/supabase.ts`,
-  `scripts/check-db.mts`, `tsconfig.json`, `CLAUDE.md`. Anything else —
+  `scripts/check-db.mts`, `tsconfig.json`, `CLAUDE.md`,
+  `docs/current/SPEC.md` and `docs/current/HUMAN_ACTION.md`. Anything else —
   especially `.claude/settings.json` or `next-env.d.ts` — means the staging
   was too broad.
+
+  The two `docs/current/` files are in the list on purpose: the analyst stage
+  writes them and never commits them, so the implementing PR carries them, as
+  e63c1fc did for task 2. They must reach `main_agent` before
+  `/archive-instructions` can file them.
+
+  Use the **three-dot** form. `git diff origin/main_agent --stat` also reports
+  everything `main_agent` gained since this branch left it (today: two
+  agent-loop commits), which looks like over-broad staging and is not.
 - `gh pr checks` shows `ci` **success**, and after merge
   `gh run list --workflow=ci.yml --branch=main --limit=1` shows conclusion
   `success`.
