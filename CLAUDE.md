@@ -87,6 +87,12 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 - Write a failing test before fixing a bug where practical.
 - Verification means a pass/fail signal with output shown — not "looks
   done" (§1).
+- **Every PR opened against `main_agent` gets an advisory review.** A
+  PostToolUse hook on `gh pr create` launches `scripts/pr-review.sh` detached:
+  inline findings from `/code-review`, plus one summary comment orienting the
+  human's read. It never blocks — the loop may merge the PR before the review
+  lands. Run it by hand with `scripts/pr-review.sh <pr>` (`--force` to redo a
+  reviewed PR, `--dry-run` to see the prompts).
 - **Track background processes.** Anything still running after a tool call
   returns (background Bash, dev servers, watchers, tunnels) gets an entry
   appended to `.llocal/running_process/PROCESSES.md` in that file's documented

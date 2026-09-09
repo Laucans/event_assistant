@@ -23,7 +23,8 @@
       "Bash(git push:*)",
       "Bash(gh api:*)",
       "Bash(gh run:*)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(scripts/pr-review.sh:*)"
     ],
     "ask": [],
     "deny": [
@@ -64,7 +65,19 @@
           {
             "type": "command",
             "timeout": 10,
-            "command": "python3 -c 'import sys,json,re,shlex,os\ntry:\n    data=json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\nif (data.get(\"tool_name\") or \"\")!=\"Bash\":\n    sys.exit(0)\ncmd=(data.get(\"tool_input\") or {}).get(\"command\") or \"\"\nhome=os.path.expanduser(\"~\")\nQ=chr(34)+chr(39)\nOK=(\".env.example\",\".env.sample\",\".env.template\")\ndef bad(tok):\n    t=tok.strip(Q)\n    if not t:\n        return \"\"\n    t=re.sub(r\"^(~|\\$HOME|\\$\\{HOME\\})(?=/|$)\",home,t)\n    p=t\n    while p.startswith(\"./\"):\n        p=p[2:]\n    parts=[x for x in p.split(\"/\") if x and x!=\".\"]\n    if not parts:\n        return \"\"\n    b=parts[-1]\n    if b==\".env\" or (b.startswith(\".env.\") and b not in OK):\n        return t\n    if \"secrets\" in parts[:-1]:\n        return t\n    if t.startswith(\"/\"):\n        for d in (\".ssh\",\".aws\",\".config\"):\n            if t.startswith(home+\"/\"+d+\"/\"):\n                return t\n    return \"\"\nfor seg in re.split(r\"[;|&\\n]\",cmd):\n    try:\n        toks=shlex.split(seg)\n    except Exception:\n        toks=seg.split()\n    for tok in toks:\n        h=bad(tok)\n        if h:\n            sys.stderr.write(\"Blocked: \"+h+\" is a secret path. permissions.deny in .claude/settings.json blocks the Read tool on .env/.env.*/secrets/**/~/.ssh/~/.aws/~/.config, and this Bash command would read the same secrets around that rule. If you only need to know which variables exist, read .env.example instead.\")\n            sys.exit(2)\nsys.exit(0)\n'"
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/hooks/no-secret-paths.py\"; [ -f \"$f\" ] || exit 0; python3 \"$f\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/pr-review-trigger.py\""
           }
         ]
       }
