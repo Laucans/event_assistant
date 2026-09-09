@@ -61,10 +61,18 @@ const baseUrl = url.replace(/\/+$/, "");
 // PGRST205) still proves the key authenticated — an invalid key never gets
 // that far, it is turned away with 401 "Invalid API key".
 //
+// The probe table is deliberately a name no migration will ever create. A real
+// table would make this check mean two different things either side of its
+// migration (404 before, 200 after), and a 200 with zero rows — what RLS
+// returns to the publishable key on a table with no read policy — would pass
+// for the same reason as a 404. Against a name that never exists, the
+// missing-table 404 is the answer forever, so the probe keeps one meaning.
+// Schema state is Probe B's job, below.
+//
 // Either way a connect failure means the URL is wrong or the project is
 // paused, and nothing here ever prints a key.
 const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205"]);
-const PROBE_TABLE = "cities";
+const PROBE_TABLE = "__connectivity_probe__";
 
 async function get(
   path: string,
@@ -107,24 +115,21 @@ async function probePublishableKey(key: string): Promise<void> {
   const path = `/rest/v1/${PROBE_TABLE}?select=*&limit=1`;
   const response = await get(path, key, label);
 
-  // 404 is only accepted when PostgREST says the table is missing; a bare 404
-  // would mean something else entirely and must not pass for authentication.
-  if (response.status === 404) {
-    const code = await missingTableCode(response);
-    if (!code) {
-      fail(`${label}: unexpected 404 from ${path} — not a missing-table error`);
-    }
-    console.log(
-      `OK    ${label}: authenticated against ${path} (HTTP 404, ${code} — table not migrated yet)`
-    );
-    return;
-  }
-  if (response.status !== 200) {
+  // The missing-table 404 *is* the pass, and only when PostgREST names the
+  // table as the reason: a bare 404 means something else entirely and must not
+  // be read as proof that the key authenticated.
+  if (response.status !== 404) {
     fail(
-      `${label}: expected HTTP 200 or a missing-table 404 from ${path}, got ${response.status} ${response.statusText}`
+      `${label}: expected a missing-table 404 from ${path}, got ${response.status} ${response.statusText}`
     );
   }
-  console.log(`OK    ${label}: authenticated against ${path} (HTTP 200)`);
+  const code = await missingTableCode(response);
+  if (!code) {
+    fail(`${label}: unexpected 404 from ${path} — not a missing-table error`);
+  }
+  console.log(
+    `OK    ${label}: authenticated against ${path} (HTTP 404, ${code} — the probe table never exists by design)`
+  );
 }
 
 await probePublishableKey(publishableKey);

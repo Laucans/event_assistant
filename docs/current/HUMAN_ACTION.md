@@ -13,13 +13,13 @@ next to the spec, into
 
 ## Before Claude starts
 
-- [x] Create the Supabase account (free plan).
-- [x] Create the project in region `ca-central-1` (Montreal) and save the
+- [ ] Create the Supabase account (free plan).
+- [ ] Create the project in region `ca-central-1` (Montreal) and save the
       database password.
-- [x] Hand over the Project URL and publishable key from Settings → API Keys;
+- [ ] Hand over the Project URL and publishable key from Settings → API Keys;
       write the secret key into `.env.local` yourself.
-- [x] Say whether the existing `.env.local` holds anything worth keeping.
-- [x] _(Optional)_ Pre-allowlist `npm install`, `npm run db:check` and
+- [ ] Say whether the existing `.env.local` holds anything worth keeping.
+- [ ] _(Optional)_ Pre-allowlist `npm install`, `npm run db:check` and
       `node scripts/*` via `/permissions`.
 
 ## While Claude works
