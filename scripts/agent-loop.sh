@@ -18,9 +18,18 @@
 # or a round that moves no task to DONE. Logs land in
 # .llocal/agent-loop/<run-id>/ (gitignored).
 #
+# Resuming is the default. A halted round records which stages actually
+# completed in .llocal/agent-loop/state, so re-running after you unblock
+# something picks up at the next stage instead of re-doing an expensive
+# /code that already merged. The record is scoped to one task and cleared
+# when the task closes; --restart throws it away and runs the round from
+# the top.
+#
 # Usage:
 #   scripts/agent-loop.sh                 # spend the rounds budget
 #   scripts/agent-loop.sh --rounds 1      # one task
+#   scripts/agent-loop.sh --status        # what a re-run would resume from
+#   scripts/agent-loop.sh --restart       # forget the completed stages
 #   scripts/agent-loop.sh --dry-run       # write the prompts, call nothing
 #
 # Env overrides: INTEGRATION_BRANCH, PERMISSION_MODE, MAX_ROUNDS, STAGES,
@@ -41,10 +50,12 @@ STAGES=${STAGES:-"analyst code create-test archive-instructions"}
 MODEL=${MODEL:-}
 ALLOW_DIRTY=${ALLOW_DIRTY:-0}
 DRY_RUN=0
+RESTART=0
 
 MILESTONE=docs/current/CURRENT_MILESTONE.md
 SPEC=docs/current/SPEC.md
 TRACKING=docs/current/HUMAN_ACTION_TRACKING.md
+STATE=.llocal/agent-loop/state
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -53,7 +64,17 @@ while [ $# -gt 0 ]; do
     --branch) INTEGRATION_BRANCH=$2; shift 2 ;;
     --model) MODEL=$2; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
+    --restart) RESTART=1; shift ;;
+    --status)
+      if [ -s "$STATE" ]; then
+        echo "resume point (.llocal/agent-loop/state):"
+        sed 's/^/  /' "$STATE"
+        [ -f "$SPEC" ] && echo "  spec=$SPEC present — /analyst would be skipped"
+      else
+        echo "no resume point — the next run starts a round from the top"
+      fi
+      exit 0 ;;
+    -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -155,6 +176,45 @@ EOS
 
 stage_enabled() { case " $STAGES " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 
+# --- resume state ----------------------------------------------------------
+# Which stages of the current task have actually completed. Survives a halt,
+# so unblocking something and re-running does not re-run a /code that already
+# merged. Scoped to one task: a different task resets it.
+state_task() {
+  [ -f "$STATE" ] || return 0
+  sed -n '1s/^task=//p' "$STATE"
+}
+
+# A dry run reads the state — so it previews the real skips — but never
+# writes it, or previewing would destroy the resume point it is describing.
+state_open() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  mkdir -p "$(dirname "$STATE")"
+  printf 'task=%s\n' "$1" > "$STATE"
+}
+
+state_mark() { printf 'stage=%s\n' "$1" >> "$STATE"; }
+
+# $task_key is the round's task, set by the loop. Matching it here keeps a
+# dry run — which cannot rewrite the file — from previewing another task's
+# skips as if they were this one's.
+state_done() {
+  [ -f "$STATE" ] && [ "$(state_task)" = "$task_key" ] && grep -qx "stage=$1" "$STATE"
+}
+state_clear() { [ "$DRY_RUN" = 1 ] || rm -f "$STATE"; }
+
+# run_stage, but only once per task across runs.
+run_stage_once() {
+  local stage=$1 extra=${2:-}
+  if state_done "$stage"; then
+    log "/$stage already completed for this task — skipping (--restart to force)"
+    return 0
+  fi
+  run_stage "$stage" "$extra"
+  # A dry run executes nothing, so it must not claim a stage as done.
+  [ "$DRY_RUN" = 1 ] || state_mark "$stage"
+}
+
 run_stage() {
   local stage=$1 extra=${2:-} prompt log_file
   log_file="$LOG_DIR/${STEP}-${stage}.log"
@@ -250,6 +310,19 @@ what is missing rather than planning on top of it."
     log "task $num is marked 'needs you' — the ticks in $TRACKING decide, not the marker"
   fi
 
+  # Resume, unless this is a different task than the one the state describes
+  # or --restart was passed.
+  task_key="$num|$title"
+  if [ "$RESTART" = 1 ]; then
+    log "--restart — forgetting the completed stages for this task"
+    state_open "$task_key"
+    RESTART=0
+  elif [ "$(state_task)" != "$task_key" ]; then
+    state_open "$task_key"
+  else
+    log "resuming task $num — already completed: $(sed -n 's/^stage=/ /p' "$STATE" | tr -d '\n' | sed 's/^ *//')"
+  fi
+
   before=$(count_done)
 
   # A SPEC left over from an interrupted run is the resume point: keep it
@@ -278,16 +351,18 @@ instead of guessing."
     halt "task $num needs you first — tick the items in $TRACKING, then re-run (the spec is kept)"
   fi
 
-  stage_enabled code && run_stage code
-  stage_enabled create-test && run_stage create-test
+  stage_enabled code && run_stage_once code
+  stage_enabled create-test && run_stage_once create-test
 
   if stage_enabled archive-instructions; then
-    run_stage archive-instructions "Archive task $num (\"$title\") only."
+    run_stage_once archive-instructions "Archive task $num (\"$title\") only."
     [ -f "$SPEC" ] && halt "/archive-instructions left $SPEC in place — the task did not close"
     [ "$(count_done)" -gt "$before" ] \
       || halt "round $round moved no task to DONE in $MILESTONE — stopping rather than looping on the same task"
   fi
 
+  # The task closed: the resume record has nothing left to describe.
+  state_clear
   log "round $round done — $(count_done) task(s) DONE"
 done
 
