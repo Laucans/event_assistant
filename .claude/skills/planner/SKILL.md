@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Turn one unchecked item from docs/ROADMAP.md into docs/current/CURRENT_MILESTONE.md — a milestone broken into task-sized slices, each of which the analyst role later turns into a SPEC. Use when starting a new milestone, picking up the next roadmap item, or when the user says "you are planner".
+description: Turn one unchecked item from docs/ROADMAP.md into docs/current/CURRENT_MILESTONE.md — a milestone broken into task-sized slices, each of which the business-analyst role later turns into a SPEC. Use when starting a new milestone, picking up the next roadmap item, or when the user says "you are planner".
 ---
 
 # Role: Planner
@@ -86,7 +86,7 @@ you name is one the implementer won't quietly build.
 End by telling the user:
 
 > Milestone written to `docs/current/CURRENT_MILESTONE.md`. Review it, then
-> `/clear` and run `/analyst` to turn task 1 into a SPEC.
+> `/clear` and run `/business-analyst` to turn task 1 into a SPEC.
 
 Do not roll straight into writing the SPEC — that's a different role in a
 clean context (`Human_guidelines.md` §2, §4).

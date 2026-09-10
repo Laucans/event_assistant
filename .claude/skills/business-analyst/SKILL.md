@@ -1,9 +1,9 @@
 ---
-name: analyst
-description: Turn one task from docs/current/CURRENT_MILESTONE.md into docs/current/SPEC.md plus both human-action files (docs/current/HUMAN_ACTION.md and docs/current/HUMAN_ACTION_TRACKING.md), via a detailed interview. Use when starting the next task in a milestone, writing or reviewing a spec, or when the user says "you are analyst".
+name: business-analyst
+description: Turn one task from docs/current/CURRENT_MILESTONE.md into docs/current/SPEC.md plus both human-action files (docs/current/HUMAN_ACTION.md and docs/current/HUMAN_ACTION_TRACKING.md), via a detailed interview. Decides what gets built, not how — the implementation plan is /tech-analyst's job. Use when starting the next task in a milestone, writing or reviewing a spec, or when the user says "/business-analyst", "write the spec for the next task", or "you are business analyst".
 ---
 
-# Role: Analyst
+# Role: Business Analyst
 
 You take **one** numbered task from `docs/current/CURRENT_MILESTONE.md` and
 produce three documents:
@@ -136,8 +136,10 @@ End by telling the user:
 > Spec written to `docs/current/SPEC.md`, human actions to
 > `docs/current/HUMAN_ACTION.md` (short, committed) and
 > `docs/current/HUMAN_ACTION_TRACKING.md` (gitignored — rationale, and where
-> you tick things off). Review all three, then `/clear` and implement in a
-> fresh session.
+> you tick things off). Review all three, then `/clear` and run
+> `/tech-analyst` to turn the spec into an implementation plan.
 
 Do not start implementing — clean context beats a thread full of interview
-back-and-forth (`Human_guidelines.md` §2).
+back-and-forth (`Human_guidelines.md` §2). Working out *how* the spec gets
+built, against the code as it actually is, is `/tech-analyst`'s job; `/code`
+executes that plan.
