@@ -8,14 +8,21 @@ description: Implement the task in docs/current/SPEC.md end to end — pre-fligh
 You take the single task described in `docs/current/SPEC.md` and land it:
 pre-flight gate, plan, build, verify with real output, review, PR, merge.
 
-You do **not** write specs (`/analyst`), do **not** re-plan the milestone
-(`/planner`), and do **not** archive (`/archive-instructions`). If
-`docs/current/SPEC.md` is missing, say so and point at `/analyst` — never
-reconstruct the task yourself.
+You do **not** write specs (`/business-analyst`), do **not** re-plan the
+milestone (`/planner`), and do **not** archive (`/archive-instructions`).
+If `docs/current/SPEC.md` is missing, say so and point at
+`/business-analyst` — never reconstruct the task yourself.
 
 The SPEC is the contract. Your job is to execute it, not to improve it.
 
 ## 1. Read first
+
+**If a `/tech-analyst` plan is already in this session's context** — the
+loop runs both stages in one process — that stage has already read these
+files. Don't re-read them: adopt the plan, skim the SPEC's `Verification`
+section for the bullets you'll have to run, and go to section 4.
+
+Otherwise (a human ran `/code` on its own) read:
 
 - `docs/current/SPEC.md` — the contract: `Problem` (including the stop
   line), `Goals / Non-goals`, `Approach`, `Files & interfaces touched`,
@@ -35,8 +42,14 @@ you there — a spec is written to be self-contained for a fresh session.
 
 ## 2. Pre-flight gate
 
-Report all four findings, then wait for a go-ahead. Nothing is edited
-before this.
+**If a `/tech-analyst` plan is already in context**, this gate has been run
+— adopt its four findings as they stand rather than re-deriving them, and
+act on them: an open *Before Claude starts* item still blocks, and its
+dirty-file list is the one you spend in section 7. Re-run only a check
+whose answer could have changed since.
+
+Otherwise, report all four findings yourself, then wait for a go-ahead.
+Nothing is edited before this.
 
 - **Blocking human actions.** Quote every `- [ ]` item under *Before
   Claude starts* in `HUMAN_ACTION_TRACKING.md`. If any is open, stop —
@@ -58,6 +71,14 @@ before this.
 ## 3. Plan before building
 
 `Human_guidelines.md` §1: explore → plan → build → verify, in order.
+
+**If a `/tech-analyst` plan is already in context**, it *is* the plan.
+Adopt its checklist and its stop line verbatim into `TodoWrite`, carry its
+risks and unknowns into the build, and start building — you do not derive
+a second plan, and re-planning what was just planned burns the context the
+build needs.
+
+Otherwise, build the checklist yourself:
 
 - Turn the SPEC's numbered `Approach` into a working checklist, one item
   per step (`TodoWrite` is the natural fit), so nothing gets skipped.
@@ -141,8 +162,8 @@ push are a backstop, not something to test.
 
 ## 8. Edge cases
 
-- **No `docs/current/SPEC.md`.** Stop and say `/analyst` writes it. Do not
-  build from `CURRENT_MILESTONE.md` directly.
+- **No `docs/current/SPEC.md`.** Stop and say `/business-analyst` writes
+  it. Do not build from `CURRENT_MILESTONE.md` directly.
 - **Already implemented.** If the working tree or `git log` shows the
   SPEC's artifacts already landed, report what exists and which
   Verification bullets confirm it — don't redo the work.
@@ -161,7 +182,7 @@ push are a backstop, not something to test.
   `next typegen`. Run `git checkout -- next-env.d.ts` before staging;
   never hand-edit it.
 - **Scope creep mid-task.** An adjacent improvement you spot is a note for
-  the next `/analyst` run, not a commit on this branch.
+  the next `/business-analyst` run, not a commit on this branch.
 - **Two strikes** (`Human_guidelines.md` §4). If the same correction lands
   twice in one session, stop and suggest `/clear` plus a fresh `/code` run
   carrying what you learned. Grinding on in polluted context costs more.

@@ -6,11 +6,12 @@ description: Close a finished task by moving docs/current/SPEC.md and docs/curre
 # Role: Archivist
 
 You close the loop the docs pipeline is missing. `/planner` writes a
-milestone, `/analyst` writes a SPEC, the SPEC gets implemented — and then
-nothing. The finished `docs/current/SPEC.md` sits there until the next
-`/analyst` run overwrites it, destroying the record of what was asked for,
-task by task. An earlier archive directory under `docs/current/` was meant
-to catch that; it was never implemented and has been removed.
+milestone, `/business-analyst` writes a SPEC, the SPEC gets implemented —
+and then nothing. The finished `docs/current/SPEC.md` sits there until the
+next `/business-analyst` run overwrites it, destroying the record of what
+was asked for, task by task. An earlier archive directory under
+`docs/current/` was meant to catch that; it was never implemented and has
+been removed.
 
 You produce a durable trace of the vibe-coding process: every task's spec
 and human-action list preserved under its milestone, with
@@ -104,7 +105,7 @@ Show the resolved destination path to the user before creating it.
 
 **Move, not copy.** Between tasks `docs/current/` holds only
 `CURRENT_MILESTONE.md`, so there is never a stale spec for the next
-`/analyst` run to mistake for live work.
+`/business-analyst` run to mistake for live work.
 
 **Never overwrite.** If a file of that name already exists at the
 destination, report it and stop — an existing archive entry means this
@@ -162,8 +163,8 @@ End by telling the user:
 
 - exactly what moved, and where;
 - that `docs/current/HUMAN_ACTION_TRACKING.md` still holds the archived
-  task's notes and stays stale until `/analyst` rewrites it for the next
-  task;
+  task's notes and stays stale until `/business-analyst` rewrites it for
+  the next task;
 - to run `/commit` when they're ready.
 
 This skill never commits on its own.

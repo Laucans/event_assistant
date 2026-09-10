@@ -9,6 +9,11 @@
 #
 # /code-review and /commit are not stages: /code runs the review at its
 # step 6, and /code and /create-test each end in branch -> PR -> merge.
+# /tech-analyst is not a stage either, but for the opposite reason: its plan
+# is context, not a file, so a process of its own would throw the plan away
+# when it exited. It opens the code stage's process instead — one `claude
+# -p` where /tech-analyst plans against the real code and /code builds what
+# it planned.
 #
 # Every stage is billed and the bill is written down: one row per stage in
 # .llocal/agent-loop/costs.tsv, the real cost off the run's JSON envelope
@@ -59,18 +64,23 @@ cd "$(git rev-parse --show-toplevel)"
 # further down runs generically — `/skill` plus the execution-context
 # preamble — so a new entry needs nothing else to work.
 #
-# The models are split on where a bad answer gets paid for twice. /analyst
-# writes the SPEC every later stage reads and /code writes the change itself:
-# an error there comes back as rework. /create-test writes hermetic Vitest
-# against a spec that already exists, and /archive-instructions moves two
-# files and ticks a checkbox — neither is a reasoning problem. Retune from
-# .llocal/agent-loop/costs.tsv, not from intuition.
+# The models are split on where a bad answer gets paid for twice.
+# /business-analyst writes the SPEC every later stage reads, and the code
+# stage plans and writes the change itself: an error in either comes back as
+# rework. /create-test writes hermetic Vitest against a spec that already
+# exists, and /archive-instructions moves two files and ticks a checkbox —
+# neither is a reasoning problem. Retune from .llocal/agent-loop/costs.tsv,
+# not from intuition.
+#
+# The `code` entry prices both halves of its stage. /tech-analyst and /code
+# share one process, so they cannot be billed apart, and costs.tsv books the
+# pair under `code`.
 #
 # `planner` is the one entry that does not run in the per-task sequence: put
 # it in the table and it fires when every task in the milestone is DONE, to
 # open the next roadmap item. Leave it out and the loop stops there instead.
 PIPELINE=(
-  "analyst|opus|high"
+  "business-analyst|opus|high"
   "code|opus|high"
   "create-test|sonnet|high"
   "archive-instructions|haiku|low"
@@ -162,12 +172,12 @@ while [ $# -gt 0 ]; do
       if [ -s "$STATE" ]; then
         echo "resume point (.llocal/agent-loop/state):"
         sed 's/^/  /' "$STATE"
-        [ -f "$SPEC" ] && echo "  spec=$SPEC present — /analyst would be skipped"
+        [ -f "$SPEC" ] && echo "  spec=$SPEC present — /business-analyst would be skipped"
       else
         echo "no resume point — the next run starts a round from the top"
       fi
       exit 0 ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^[^#]/p' "$0" | sed '$d'; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -219,9 +229,9 @@ tasks_todo() { milestone_tasks | awk -F'\t' '$2 == "todo"'; }
 count_done() { milestone_tasks | awk -F'\t' '$2 == "done"' | wc -l | tr -d ' '; }
 
 # Unticked items under "Before Claude starts" — the ones /code treats as
-# blocking by construction. Items the analyst marked (Optional) are advice,
-# not prerequisites, so they do not block. Read-only: the ticks are the
-# human's to write.
+# blocking by construction. Items the business analyst marked (Optional) are
+# advice, not prerequisites, so they do not block. Read-only: the ticks are
+# the human's to write.
 open_human_actions() {
   [ -f "$TRACKING" ] || return 0
   python3 - "$TRACKING" <<'PY'
@@ -259,8 +269,10 @@ These rules override the skill's interactive stopping points:
    `gh pr merge --rebase`, and never a direct push.
 4. Stage by name, never `git add -A`. The tree may carry unrelated
    in-flight work that is not yours to commit.
-5. Do not run another pipeline stage yourself, and do not /clear. The loop
-   runs one process per stage.
+5. Do not start another pipeline stage as its own process, and do not
+   /clear. The loop runs one process per stage. Where this prompt names a
+   second skill to continue into, that continuation is part of this same
+   stage — not a new one, and not something to hand off.
 6. End your reply with `AGENT_LOOP_OK: <one-line summary>` if the stage
    completed, or `AGENT_LOOP_STOP: <reason>` if it did not.
 --- END EXECUTION CONTEXT ---
@@ -296,32 +308,40 @@ state_clear() { [ "$DRY_RUN" = 1 ] || rm -f "$STATE"; }
 
 # run_stage, but only once per task across runs.
 run_stage_once() {
-  local stage=$1 extra=${2:-}
+  local stage=$1 extra=${2:-} lead=${3:-}
   if state_done "$stage"; then
     log "/$stage already completed for this task — skipping (--restart to force)"
     return 0
   fi
-  run_stage "$stage" "$extra"
+  run_stage "$stage" "$extra" "$lead"
   # A dry run executes nothing, so it must not claim a stage as done.
   [ "$DRY_RUN" = 1 ] || state_mark "$stage"
 }
 
 run_stage() {
-  local stage=$1 extra=${2:-} model effort prompt log_file json_file rc cost
+  local stage=$1 extra=${2:-} lead=${3:-}
+  local model effort label prompt log_file json_file rc cost
   model=$(stage_model "$stage")
   effort=$(stage_effort "$stage")
+  # A stage normally opens on the skill it is named after. `lead` is for the
+  # one that does not: the code stage opens on /tech-analyst and continues
+  # into /code inside the same process. It is still logged, billed and
+  # resumed as `code` — one entry in PIPELINE, one row in the ledger.
+  lead=${lead:-/$stage}
+  label=$lead
+  [ "$lead" = "/$stage" ] || label="$lead -> /$stage"
   log_file="$LOG_DIR/${STEP}-${stage}.log"
   json_file="$LOG_DIR/${STEP}-${stage}.json"
-  prompt="/$stage"$'\n'"$(preamble)"
+  prompt="$lead"$'\n'"$(preamble)"
   [ -n "$extra" ] && prompt="$prompt"$'\n'"$extra"
 
   if [ "$DRY_RUN" = 1 ]; then
     printf '%s\n' "$prompt" > "$log_file"
-    log "dry-run /$stage ($model, effort $effort) — prompt written to $log_file"
+    log "dry-run $label ($model, effort $effort) — prompt written to $log_file"
     return 0
   fi
 
-  log "/$stage — $model, effort $effort ..."
+  log "$label — $model, effort $effort ..."
   set +e
   claude -p "$prompt" --permission-mode "$PERMISSION_MODE" \
     --model "$model" --effort "$effort" --output-format json \
@@ -404,13 +424,13 @@ PY
 # They read $num, $title and $before from the round.
 
 # A SPEC left over from an interrupted run is the resume point: keep it rather
-# than letting /analyst overwrite the record of what was asked.
-stage_analyst() {
+# than letting /business-analyst overwrite the record of what was asked.
+stage_business_analyst() {
   if [ -f "$SPEC" ]; then
-    log "$SPEC already exists — skipping /analyst (resuming a previous run)"
+    log "$SPEC already exists — skipping /business-analyst (resuming a previous run)"
     return 0
   fi
-  run_stage analyst "Take task $num (\"$title\") from docs/current/CURRENT_MILESTONE.md. The
+  run_stage business-analyst "Take task $num (\"$title\") from docs/current/CURRENT_MILESTONE.md. The
 interview in step 3 of the skill cannot happen — no human is reachable.
 Answer each question you would have asked from docs/PROJECT.md,
 docs/ARCHITECTURE.md and the repo itself, and record every answer you had
@@ -419,7 +439,25 @@ If an assumption would make the task useless or harmful when wrong — a
 paid service, a schema decision the later tasks depend on, a credential
 only the human holds — that is ambiguity, not a default: AGENT_LOOP_STOP
 instead of guessing."
-  [ -f "$SPEC" ] || halt "/analyst did not produce $SPEC"
+  [ -f "$SPEC" ] || halt "/business-analyst did not produce $SPEC"
+}
+
+# The code stage is two skills on one context. /tech-analyst plans against the
+# real code and writes that plan nowhere — by design, it is a reply, not a
+# file — so the only place it survives is the session /code is about to build
+# in. A stage of its own would hand /code a fresh context and nothing to
+# build from, which is why the pipeline table has no tech-analyst entry.
+stage_code() {
+  run_stage_once code "The task is docs/current/SPEC.md — task $num (\"$title\") of the milestone.
+Plan it as /tech-analyst: the pre-flight gate, the ordered checklist against
+the real code, the stop line, the risks. Then, in this same session, without
+waiting for a go-ahead and without /clear, carry out
+.claude/skills/code/SKILL.md against your own plan — build, run every
+Verification bullet with real output, /code-review, then branch -> PR ->
+gh pr merge --rebase. /code's steps 1-3 are what you just did as the
+tech analyst; adopt your own findings instead of re-deriving them. Nothing
+outside this session can read your plan, so a gate finding or a risk you do
+not act on now is lost — put it in your reply." "/tech-analyst"
 }
 
 stage_archive_instructions() {
@@ -436,15 +474,17 @@ stage_archive_instructions() {
 }
 
 # The ticks in the tracking file are what gate the building stages, and they
-# are only the right ticks once /analyst has written the list for THIS task —
-# so this runs between the analyst and whatever comes after it, once a round.
+# are only the right ticks once the business analyst has written the list for
+# THIS task —
+# so this runs between /business-analyst and whatever comes after it, once a
+# round.
 human_gate() {
   local blocked
   # An absent file is not an absent blocker: it is gitignored, so a fresh
   # clone has none, and reading no items out of it would let the loop build
   # straight through prerequisites nobody has done.
   if [ ! -f "$TRACKING" ]; then
-    halt "cannot check the blocking human actions — $TRACKING is absent (gitignored, and written by /analyst). Run /analyst for task $num, or restore the file, before letting the loop build."
+    halt "cannot check the blocking human actions — $TRACKING is absent (gitignored, and written by /business-analyst). Run /business-analyst for task $num, or restore the file, before letting the loop build."
   fi
   blocked=$(open_human_actions)
   [ -n "$blocked" ] || return 0
@@ -477,6 +517,12 @@ preflight() {
       *) halt "PIPELINE entry '$entry' — effort '$effort' is not low|medium|high|xhigh|max" ;;
     esac
   done
+
+  # PIPELINE has no tech-analyst entry — the code stage opens on it — so the
+  # loop above cannot catch that skill missing.
+  if stage_enabled code && [ ! -f .claude/skills/tech-analyst/SKILL.md ]; then
+    halt "the code stage opens on /tech-analyst but .claude/skills/tech-analyst/SKILL.md does not exist"
+  fi
 
   git rev-parse --verify --quiet "$INTEGRATION_BRANCH" >/dev/null \
     || halt "branch $INTEGRATION_BRANCH does not exist — run: git branch $INTEGRATION_BRANCH origin/main"
@@ -534,7 +580,7 @@ what is missing rather than planning on top of it."
 
   # `needs you` says the task has human prerequisites, not that it can never
   # run. The ticks in the tracking file are the gate, and they are checked
-  # below — once /analyst has written the list for THIS task.
+  # below — once /business-analyst has written the list for THIS task.
   if [ "$kind" = human ]; then
     log "task $num is marked 'needs you' — the ticks in $TRACKING decide, not the marker"
   fi
@@ -562,7 +608,7 @@ what is missing rather than planning on top of it."
     [ "$stage" = planner ] && continue   # rollover only, handled above
     stage_enabled "$stage" || continue
 
-    if [ "$stage" != analyst ] && [ "$gate_pending" = 1 ]; then
+    if [ "$stage" != business-analyst ] && [ "$gate_pending" = 1 ]; then
       human_gate
       gate_pending=0
     fi

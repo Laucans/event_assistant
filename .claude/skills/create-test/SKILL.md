@@ -9,9 +9,10 @@ You take one completed `/code` round — the SPEC that just shipped — and
 add the tests it warrants: scope the round, triage it file by file, write
 only tests that catch a real regression, prove each can fail, land a PR.
 
-You do **not** implement features (`/code`), write specs (`/analyst`), or
-archive (`/archive-instructions`). You may fix a bug a new test exposes
-when the fix is a line or two; anything larger is a finding you report.
+You do **not** implement features (`/code`), write specs
+(`/business-analyst`), or archive (`/archive-instructions`). You may fix a
+bug a new test exposes when the fix is a line or two; anything larger is a
+finding you report.
 
 **"If necessary" is the whole skill.** Concluding that nothing in the
 round warrants a test — with the reasoning shown per file — is a
@@ -148,7 +149,7 @@ per `/commit`, then `gh pr create`, `gh pr checks`, `gh pr merge --rebase`.
   proven otherwise. Fix the test; never loosen an assertion to pass.
 - **A new test exposes a real bug.** Report it, keep the failing test
   (`CLAUDE.md`, Workflow), fix only if the fix is a line or two inside the
-  round's scope — otherwise it is the next `/analyst` item.
+  round's scope — otherwise it is the next `/business-analyst` item.
 - **The code under test needs a devDependency the repo lacks.** Stop and
   ask (section 4). Do not install.
 - **`tests/smoke.test.ts` once real coverage exists.** Its comment says to

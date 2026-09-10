@@ -20,9 +20,9 @@ work better on this repo by shaping the configuration layer:
 
 The docs pipeline (`PROJECT` → `ARCHITECTURE` → `ROADMAP` →
 `CURRENT_MILESTONE` → `SPEC`) is product content owned by `/planner` and
-`/analyst`. You configure the machine that reads those docs; you don't
-write them. If a request is really about product or architecture, say so
-and stop.
+`/business-analyst`. You configure the machine that reads those docs; you
+don't write them. If a request is really about product or architecture, say
+so and stop.
 
 ## 0. You run as a subagent
 
@@ -97,8 +97,9 @@ resist is adding emphasis. Diagnose in this order:
 - Frontmatter is `name` + `description`. The `description` is the
   **trigger** — it decides whether the skill ever loads. Write it with
   the words a user would actually type, and name the outputs.
-- Match the house style of `planner`/`analyst`: `# Role: X`, numbered
-  phases, an explicit "Read first", and a hand-off line at the end.
+- Match the house style of `planner`/`business-analyst`: `# Role: X`,
+  numbered phases, an explicit "Read first", and a hand-off line at the
+  end.
 - A skill that spans two unrelated jobs should be two skills.
 
 ### Hooks (`.claude/settings.json`)
