@@ -30,7 +30,7 @@ import pytest
 from conftest import ORACLE
 
 from pipeline.core.domain.outcomes import stage_result
-from pipeline.core.domain.prompts import prompt_builder as prompts
+from pipeline.core.domain import prompts
 
 BRANCH = "main_agent"
 NUM = "4"

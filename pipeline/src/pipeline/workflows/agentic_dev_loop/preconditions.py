@@ -1,7 +1,7 @@
 """Ce qui est verifie avant que le premier stage soit paye.
 
 Les portes qui ne sont propres a aucun workflow vivent dans
-`common.utils.checks` : `claude` sur le PATH, `gh` authentifie, la branche
+`common.checks` : `claude` sur le PATH, `gh` authentifie, la branche
 d'integration, l'arbre propre. Ce fichier ne garde que ce que **la boucle**
 exige — les etiquettes du modele en issues, un milestone atteignable, les
 skills que la table nomme — et compose les deux listes dans l'ordre ou elles
@@ -21,8 +21,9 @@ from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.agentic_dev_loop.internals import board
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
-from pipeline.workflows.common.utils import checks, hub
-from pipeline.workflows.common.utils.checks import Check
+from pipeline.core.adapters import hub
+from pipeline.workflows.common import checks
+from pipeline.workflows.common.checks import Check
 
 
 # --- ce que la boucle exige, et qu'elle seule exige ------------------------

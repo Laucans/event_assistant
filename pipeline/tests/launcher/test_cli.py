@@ -11,7 +11,7 @@ from conftest import milestone
 from pipeline.core.adapters.store import resume
 from pipeline.core.execution import session
 from pipeline.workflows.agentic_dev_loop.internals import loop as workflow_loop
-from pipeline.workflows.common.contract.outcome import WorkflowOutcome
+from pipeline.core.execution.contract.outcome import WorkflowOutcome
 from pipeline.launcher.cli import agentic_dev_loop as loop
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook

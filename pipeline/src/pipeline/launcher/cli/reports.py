@@ -24,7 +24,7 @@ from pipeline.core.adapters.store.ledger import (
 from pipeline.core.adapters.store.resume import read_pointer, stages_done
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import metrics
-from pipeline.workflows.common.utils import hub
+from pipeline.core.adapters import hub
 
 Rows = list[list[str]]
 

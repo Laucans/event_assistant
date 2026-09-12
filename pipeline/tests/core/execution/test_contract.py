@@ -13,8 +13,8 @@ import asyncio
 import pytest
 
 from pipeline.core.domain.outcomes.result import Result, Status
-from pipeline.workflows.common.contract import workflow as contract
-from pipeline.workflows.common.contract.outcome import WorkflowOutcome
+from pipeline.core.execution.contract import workflow as contract
+from pipeline.core.execution.contract.outcome import WorkflowOutcome
 
 
 class Gate:

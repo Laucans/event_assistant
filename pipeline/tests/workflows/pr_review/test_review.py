@@ -27,7 +27,7 @@ from pipeline.workflows.pr_review.stages import BRIEF_PROMPT
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook
 from pipeline.core.adapters.shell import binaries
-from pipeline.workflows.common.utils import hub as adapters
+from pipeline.core.adapters import hub as adapters
 from pipeline.workflows.pr_review.internals import passes as passes_mod
 
 
@@ -127,7 +127,7 @@ def rev(ws, monkeypatch):
     """A `pr-review` that calls nothing: gh, the passes and the journal on paper."""
     fake = FakeGh()
     # Injecte plutot que monkeypatche : c'est ce que la classe `GitHub`
-    # existe pour permettre. La couture est dans `common.utils.hub`, qui est
+    # existe pour permettre. La couture est dans `core.adapters.hub`, qui est
     # desormais le seul endroit du paquet qui construit un client.
     monkeypatch.setattr(adapters, "github",
                         lambda root: github.GitHub(root, run=fake))

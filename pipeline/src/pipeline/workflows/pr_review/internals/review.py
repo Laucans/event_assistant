@@ -25,8 +25,8 @@ from pipeline.core.adapters.agent import AgentRunner
 from pipeline.core.adapters.shell.github import GitHub
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.runtime.monitoring.logbook import Logbook
-from pipeline.workflows.common.contract.outcome import WorkflowOutcome
-from pipeline.workflows.common.utils import hub as adapters
+from pipeline.core.execution.contract.outcome import WorkflowOutcome
+from pipeline.core.adapters import hub as adapters
 from pipeline.workflows.pr_review.internals import passes, publish
 from pipeline.workflows.pr_review.internals.pr import Pr
 from pipeline.workflows.pr_review.internals.skip_rules import (

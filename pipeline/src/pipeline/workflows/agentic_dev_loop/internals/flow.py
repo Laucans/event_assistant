@@ -41,7 +41,7 @@ from dataclasses import dataclass
 
 from pipeline.core.adapters.engine import (
     Flow, listen, persisted, quiet_panels, router, start)
-from pipeline.core.domain.prompts import prompt_builder as prompts
+from pipeline.core.domain import prompts
 from pipeline.core.domain import stage_spec
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.core.domain.outcomes.result import Result
@@ -51,7 +51,7 @@ from pipeline.workflows.agentic_dev_loop.internals import board, gates, tasks
 from pipeline.workflows.agentic_dev_loop.stages import INJECTOR
 from pipeline.workflows.agentic_dev_loop.internals.board import Board
 from pipeline.workflows.agentic_dev_loop.internals.state import RoundState
-from pipeline.workflows.common.utils import hub
+from pipeline.core.adapters import hub
 
 
 @dataclass

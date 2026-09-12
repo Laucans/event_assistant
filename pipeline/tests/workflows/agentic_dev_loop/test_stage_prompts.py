@@ -13,7 +13,7 @@ faire silencieusement.
 import pytest
 from conftest import ORACLE
 
-from pipeline.core.domain.prompts import prompt_builder as prompts
+from pipeline.core.domain import prompts
 from pipeline.core.domain.stage_spec import spec_of
 from pipeline.workflows.agentic_dev_loop.stages import PIPELINE, PLANNER_STAGE
 

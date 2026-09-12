@@ -10,7 +10,7 @@ numero, puis ses sous-issues, puis leurs bloqueurs » est une politique, et
 `adapters.shell.github` ne decide de rien. Ici et pas dans `tasks.py`, a
 cote : ce module appelle `gh`, et les regles de ce voisin se relisent en leur
 passant des issues. La fabrique de l'adaptateur, elle, a quitte ce module pour
-`common.utils.hub` — construire un client n'est la politique de personne, et
+`core.adapters.hub` — construire un client n'est la politique de personne, et
 `legacy.migrate` importait ce workflow-ci rien que pour l'obtenir.
 
 Rien dans ce module n'importe le moteur de graphe. C'est ce qui laisse

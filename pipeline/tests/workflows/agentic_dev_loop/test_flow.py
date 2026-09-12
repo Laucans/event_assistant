@@ -23,7 +23,7 @@ from pipeline.workflows.agentic_dev_loop import stages as table
 from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.core.execution import session
 from pipeline.workflows.agentic_dev_loop.internals import board
-from pipeline.workflows.common.utils import hub as adapters
+from pipeline.core.adapters import hub as adapters
 from pipeline.workflows.agentic_dev_loop.internals import flow as flow_mod
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook

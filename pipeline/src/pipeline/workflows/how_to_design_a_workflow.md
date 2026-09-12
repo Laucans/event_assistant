@@ -15,7 +15,7 @@ adaptateur, une politique de domaine, ou un rouage de l'un des deux.
 
 ## 1. Ce que tu signes
 
-Le contrat vit dans `common/contract/workflow.py`. Il tient en quatre
+Le contrat vit dans `core/execution/contract/workflow.py`. Il tient en quatre
 attributs et deux méthodes :
 
 ```python
@@ -114,7 +114,7 @@ de modules. La convention en place est `<Nom>Preconditions` /
 `dry_run`, `verbose`, `quiet`, `heartbeat_s` :
 
 ```python
-from pipeline.workflows.common.contract.settings import WorkflowConfig
+from pipeline.core.execution.contract.settings import WorkflowConfig
 
 # `kw_only` seulement si tu as des champs OBLIGATOIRES : un champ sans défaut
 # ne peut pas suivre les champs défautés du parent. Sans ça, il faudrait leur
@@ -128,8 +128,8 @@ class MaConfig(WorkflowConfig):
 `preconditions.py` — compose ta liste à partir des portes communes :
 
 ```python
-from pipeline.workflows.common.utils import checks
-from pipeline.workflows.common.utils.checks import Check
+from pipeline.workflows.common import checks
+from pipeline.workflows.common.checks import Check
 
 CHECKS: tuple[Check, ...] = (
     *checks.TOOLING,                     # claude, gh, gh auth
@@ -243,11 +243,11 @@ Ton workflow **décide** ; il n'appelle jamais `subprocess`, `shutil.which`,
 ni un binaire lui-même. Si `adapters/shell/` n'a pas la méthode qu'il te
 faut, ajoute-la là-bas et lis-la depuis ta porte.
 
-Et ne **construis** pas tes clients toi-même : `common/utils/hub.py` est le
+Et ne **construis** pas tes clients toi-même : `core/adapters/hub.py` est le
 seul endroit du paquet qui le fait.
 
 ```python
-from pipeline.workflows.common.utils import hub
+from pipeline.core.adapters import hub
 
 hub.gh(cfg.workspace)      # l'adaptateur gh
 hub.repo(cfg.workspace)    # l'adaptateur git
@@ -260,11 +260,14 @@ C'est ce qui donne **une seule couture de test** : une ligne de
 
 Le commun passe par `workflows/common/`. `test_a_workflow_never_imports_another_workflow`
 l'assère, et `test_the_common_package_never_imports_a_workflow` garde l'autre
-sens — sinon le contrat deviendrait le premier workflow avec les autres
-accrochés dessus.
+sens — sinon les portes communes deviendraient celles du premier workflow,
+avec les autres accrochés dessus.
 
 Si tu as besoin de quelque chose que `agentic_dev_loop` possède, la réponse
-est de le remonter dans `common/`, pas de l'importer.
+est de le remonter — dans `workflows/common/` si c'est une **politique** (ce
+qu'un run doit exiger), dans `core/` si c'est une **forme** ou un outil qui
+ne décide rien. C'est la ligne qui a fait monter le contrat dans
+`core/execution/contract/` et laissé les portes ici.
 
 ### Le chemin rapide ne paie pas le moteur
 
@@ -409,14 +412,14 @@ résolue **à l'appel**, justement pour que ça marche).
 
 Dans cet ordre, une heure :
 
-1. `common/contract/workflow.py` — le contrat, et les quinze lignes de
+1. `core/execution/contract/workflow.py` — le contrat, et les quinze lignes de
    `sequence()`. C'est tout ce que tu dois respecter.
 2. `core/domain/outcomes/result.py` — comment un arrêt voyage.
 3. `pr_review/` en entier — c'est le plus petit des deux, et il montre la
    forme complète sans moteur de graphe. **Copie celui-là.**
 4. `agentic_dev_loop/internals/flow.py` — seulement si ton workflow est un
    graphe. C'est là que vivent les gardes de nœud.
-5. `common/utils/checks.py` — les portes que tu ne réécriras pas.
+5. `common/checks.py` — les portes que tu ne réécriras pas.
 
 `pipeline/TOUR.md` §2 et §3 donnent les couches et le sens des dépendances ;
 `pipeline/INTERNALS.md` donne le détail par module.

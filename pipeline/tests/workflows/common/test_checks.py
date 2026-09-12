@@ -5,7 +5,7 @@ workflow — la revue de PR les a gagnees sans que personne les reecrive. Ces
 tests-la portent sur elles seules ; leur composition en listes vit avec chaque
 workflow.
 
-Aucun appel externe ici non plus : la couture est dans `common.utils.hub`,
+Aucun appel externe ici non plus : la couture est dans `core.adapters.hub`,
 qui est le seul endroit du paquet qui construit un client.
 """
 
@@ -19,7 +19,8 @@ from pipeline.core.adapters.shell.git import Git
 from pipeline.core.domain.outcomes.result import Result, Status
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook
-from pipeline.workflows.common.utils import checks, hub
+from pipeline.core.adapters import hub
+from pipeline.workflows.common import checks
 
 
 class Repo:

@@ -30,7 +30,7 @@ from pipeline.workflows.legacy import migration
 from pipeline.workflows.legacy.migration import NewIssue
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.runtime.filesystem.workspace import Workspace
-from pipeline.workflows.common.utils import hub
+from pipeline.core.adapters import hub
 
 # Les documents traduits. Ce sont les derniers chemins du paquet qui pointent
 # vers `docs/` : ils vivent ici plutot que dans `runtime.filesystem`

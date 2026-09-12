@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 from pipeline.core.adapters.agent import AgentRunner
 from pipeline.core.adapters.shell.github import GitHub
 from pipeline.core.runtime.monitoring.logbook import Logbook
-from pipeline.workflows.common.contract import workflow as contract
-from pipeline.workflows.common.contract.outcome import WorkflowOutcome
+from pipeline.core.execution.contract import workflow as contract
+from pipeline.core.execution.contract.outcome import WorkflowOutcome
 from pipeline.workflows.pr_review.internals import review
 from pipeline.workflows.pr_review.postconditions import ReviewPostconditions
 from pipeline.workflows.pr_review.preconditions import ReviewPreconditions

@@ -15,7 +15,7 @@ from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.core.domain.outcomes.result import Status
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.workflows.agentic_dev_loop.internals import board
-from pipeline.workflows.common.utils import hub as adapters
+from pipeline.core.adapters import hub as adapters
 
 WS = Workspace(Path("/un/depot"))
 

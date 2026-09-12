@@ -12,7 +12,7 @@ from __future__ import annotations
 from pipeline.core.adapters.agent import AgentRunner, default_runner, progress
 from pipeline.core.adapters.store import envelope, ledger
 from pipeline.core.domain.outcomes.result import Result
-from pipeline.core.domain.prompts import prompt_builder as prompts
+from pipeline.core.domain import prompts
 from pipeline.workflows.pr_review.stages import BRIEF_PROMPT
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring.logbook import Logbook
