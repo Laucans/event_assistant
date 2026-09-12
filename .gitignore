@@ -2,6 +2,8 @@
 node_modules/
 .venv/
 __pycache__/
+# Cree par `pip install -e pipeline` a chaque install.
+*.egg-info/
 
 # env — every .env variant Next.js loads, except the committed template
 .env*

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Entree de pr-review — la logique vit dans pipeline/ (Python), ou elle est typee
+# et testee. Ce fichier n'existe que pour la memoire musculaire et pour les
+# chemins en dur qui pointent vers scripts/.
+#
+# Voir pipeline/README.md pour l'installation du venv.
+
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+py="$root/pipeline/.venv/bin/python"
+
+if [ ! -x "$py" ]; then
+  echo "pipeline: venv absent — cree-le avec :" >&2
+  echo "  /opt/homebrew/opt/python@3.13/bin/python3.13 -m venv pipeline/.venv" >&2
+  echo "  pipeline/.venv/bin/pip install -e 'pipeline[dev]'" >&2
+  exit 1
+fi
+
+exec "$py" -m "pipeline.launcher" pr-review "$@"
