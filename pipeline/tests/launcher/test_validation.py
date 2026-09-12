@@ -4,19 +4,19 @@ import argparse
 
 import pytest
 
-from pipeline.domain.stages import agentic_dev_loop_stages as stages
-from pipeline.domain.stages import stage_spec
+from pipeline.domain import stage_spec
 from pipeline.launcher import routes, validation
 from pipeline.launcher.cli import agentic_dev_loop as loop_cli
 from pipeline.launcher.cli import pr_review as review_cli
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
+from pipeline.workflows.agentic_dev_loop.stages import PIPELINE
 from pipeline.workflows.pr_review.settings import ReviewConfig
 
 LOOP = routes.find("loop")
 REVIEW = routes.find("pr-review")
 GUARD = routes.find("branch-guard")
 
-TABLE = stages.names(stages.PIPELINE)
+TABLE = stage_spec.names(PIPELINE)
 
 
 def config(route, **fields):

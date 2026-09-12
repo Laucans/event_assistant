@@ -31,7 +31,8 @@ from sdk_shapes import (  # noqa: E402,F401
     ToolResultBlock, ToolUseBlock, UserMessage)
 from fake_github import FakeGitHub  # noqa: E402,F401
 
-from pipeline.domain import tasks as tasks_mod  # noqa: E402
+from pipeline.workflows.agentic_dev_loop.internals import (  # noqa: E402
+    tasks as tasks_mod)
 
 
 class FakeSdk:

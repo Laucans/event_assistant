@@ -10,8 +10,7 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING, Callable
 
-from pipeline.domain.stages import agentic_dev_loop_stages as stages
-from pipeline.domain.stages import stage_spec
+from pipeline.domain import stage_spec
 
 if TYPE_CHECKING:
     from pipeline.launcher.routes import Route
@@ -41,9 +40,9 @@ def _named_stages(cfg: object) -> list[str]:
 def _stages_exist(cfg: object, args: argparse.Namespace) -> list[str]:
     pipeline = getattr(cfg, "pipeline", ())
     return [f"--stages/STAGES: {name!r} is not an entry of the pipeline"
-            f" — known entries: {stages.names(pipeline)}"
+            f" — known entries: {stage_spec.names(pipeline)}"
             for name in _named_stages(cfg)
-            if stages.spec_of(name, pipeline) is None]
+            if stage_spec.spec_of(name, pipeline) is None]
 
 
 def _rounds_positive(cfg: object, args: argparse.Namespace) -> list[str]:

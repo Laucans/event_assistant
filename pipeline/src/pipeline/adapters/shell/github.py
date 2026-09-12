@@ -29,7 +29,7 @@ import subprocess
 from pathlib import Path
 
 from pipeline.domain.outcomes.result import Result
-from pipeline.domain.tasks import Task, closes
+from pipeline.domain.issues import Issue
 
 # Assez pour un depot d'une personne, et une raison de ne pas dependre de
 # `--paginate` : sa sortie multi-pages n'est pas un seul document JSON dans
@@ -71,7 +71,7 @@ def unreadable(what: str, detail: str) -> Result:
         f" the repository, then re-run.")
 
 
-def _task(payload: dict) -> Task:
+def _issue(payload: dict) -> Issue:
     """Une issue de l'API, dans la forme que le domaine sait lire.
 
     Les etiquettes arrivent en objets sur la plupart des points d'entree et
@@ -81,26 +81,21 @@ def _task(payload: dict) -> Task:
     labels = []
     for label in payload.get("labels") or ():
         labels.append(label["name"] if isinstance(label, dict) else str(label))
-    return Task(number=int(payload["number"]),
+    return Issue(number=int(payload["number"]),
                 title=payload.get("title") or "",
                 state=payload.get("state") or "open",
                 labels=tuple(labels),
                 body=payload.get("body") or "")
 
 
-def _first_merged(number: int):
-    """La premiere PR mergee de la liste qui declare fermer `#number`.
+def _merged(rows) -> list[Issue]:
+    """Les PR de la liste qui ont ete mergees, dans l'ordre recu.
 
-    Une fonction nommee plutot qu'une lambda : elle porte une boucle et un
-    filtre, et `map()` se lit mieux avec un verbe qu'avec quatre lignes
-    glissees dans un argument.
+    Le filtre s'arrete la : `merged_at` est une propriete de l'API, et la
+    lire est le travail de cet adaptateur. Quelle PR *vaut preuve de
+    livraison* est la convention d'un workflow, et se decide chez lui.
     """
-    def pick(rows) -> Task | None:
-        for row in rows or []:
-            if row.get("merged_at") and closes(row.get("body"), number):
-                return _task(row)
-        return None
-    return pick
+    return [_issue(row) for row in rows or [] if row.get("merged_at")]
 
 
 class GitHub:
@@ -204,49 +199,49 @@ class GitHub:
                           "-f", f"per_page={PER_PAGE}"
                           ).map(lambda rows: [r["name"] for r in rows or []])
 
-    def issue(self, number: int) -> Result[Task]:
+    def issue(self, number: int) -> Result[Issue]:
         got = self._read(f"issue #{number}", f"issues/{number}")
         if got.failed:
             return got.recast()
-        task = _task(got.value)
+        task = _issue(got.value)
         self._ids[task.number] = int(got.value["id"])
         return Result.of(task)
 
     def issues_labelled(self, label: str,
-                        state: str = "open") -> Result[list[Task]]:
+                        state: str = "open") -> Result[list[Issue]]:
         """Les issues portant cette etiquette, PR exclues.
 
         `/issues` rend aussi les pull requests — GitHub les modelise comme des
-        issues. Une PR etiquetee `pipeline:milestone` par megarde deviendrait
-        le milestone en cours ; la cle `pull_request` est ce qui les
-        distingue.
+        issues. Une PR portant par megarde l'etiquette qu'on demande entre
+        alors dans la reponse, et un appelant qui cherche son milestone la
+        prendrait pour un ; la cle `pull_request` est ce qui les distingue.
         """
         return self._read(
             f"the {label} issues", "issues", "-X", "GET",
             "-f", f"labels={label}", "-f", f"state={state}",
             "-f", f"per_page={PER_PAGE}"
-        ).map(lambda rows: [_task(r) for r in rows or []
+        ).map(lambda rows: [_issue(r) for r in rows or []
                             if "pull_request" not in r])
 
-    def sub_issues(self, number: int) -> Result[list[Task]]:
+    def sub_issues(self, number: int) -> Result[list[Issue]]:
         return self._read(f"the sub-issues of #{number}",
                           f"issues/{number}/sub_issues",
                           "-X", "GET", "-f", f"per_page={PER_PAGE}"
-                          ).map(lambda rows: [_task(r) for r in rows or []])
+                          ).map(lambda rows: [_issue(r) for r in rows or []])
 
-    def blocked_by(self, number: int) -> Result[list[Task]]:
+    def blocked_by(self, number: int) -> Result[list[Issue]]:
         return self._read(f"what blocks #{number}",
                           f"issues/{number}/dependencies/blocked_by",
                           "-X", "GET", "-f", f"per_page={PER_PAGE}"
-                          ).map(lambda rows: [_task(r) for r in rows or []])
+                          ).map(lambda rows: [_issue(r) for r in rows or []])
 
-    def blocking(self, number: int) -> Result[list[Task]]:
+    def blocking(self, number: int) -> Result[list[Issue]]:
         return self._read(f"what #{number} blocks",
                           f"issues/{number}/dependencies/blocking",
                           "-X", "GET", "-f", f"per_page={PER_PAGE}"
-                          ).map(lambda rows: [_task(r) for r in rows or []])
+                          ).map(lambda rows: [_issue(r) for r in rows or []])
 
-    def with_blockers(self, tasks: list[Task]) -> Result[list[Task]]:
+    def with_blockers(self, tasks: list[Issue]) -> Result[list[Issue]]:
         """Les memes tasks, chacune portant ses bloqueurs et leur etat.
 
         Une requete par task : le point d'entree qui liste les sous-issues ne
@@ -258,30 +253,28 @@ class GitHub:
             blockers = self.blocked_by(t.number)
             if blockers.failed:
                 return blockers.recast()
-            out.append(Task(number=t.number, title=t.title, state=t.state,
-                            labels=t.labels, body=t.body,
-                            blocked_by=tuple(blockers.value)))
+            out.append(Issue(number=t.number, title=t.title, state=t.state,
+                             labels=t.labels, body=t.body,
+                             blocked_by=tuple(blockers.value)))
         return Result.of(out)
 
-    def merged_pr_closing(self, number: int,
-                          base: str) -> Result[Task | None]:
-        """La PR mergee sur `base` qui declare fermer `#number`, s'il y en a.
+    def merged_prs(self, base: str) -> Result[list[Issue]]:
+        """Les PR mergees sur `base`, les plus recemment touchees d'abord.
 
-        GitHub ne ferme une issue liee qu'au merge dans la branche **par
-        defaut** du depot. La boucle merge dans `INTEGRATION_BRANCH`, donc le
-        `Closes #N` de `/code` pose le lien mais ne ferme rien. Retrouver la
-        PR ici est ce qui permet au round de fermer lui-meme, sans avoir a
-        croire un stage sur parole : ce qu'on exige reste une PR **mergee**.
+        Rendues telles quelles : laquelle declare fermer quelle issue est la
+        convention de /code, pas une propriete de l'API, et la lire ici
+        remettrait une regle de workflow dans un adaptateur. L'appelant
+        filtre — voir `agentic_dev_loop.internals.tasks.first_closing`.
 
-        Une liste illisible rend un echec, pas un `None` : « l'API est en
-        panne » et « rien n'a ete livre » menent a des decisions opposees.
+        Une liste illisible rend un echec, pas une liste vide : « l'API est
+        en panne » et « rien n'a ete livre » menent a des decisions opposees.
         """
         return self._read(f"the merged pull requests on {base}",
                           "pulls", "-X", "GET",
                           "-f", "state=closed", "-f", f"base={base}",
                           "-f", "sort=updated", "-f", "direction=desc",
                           "-f", f"per_page={PER_PAGE}"
-                          ).map(_first_merged(number))
+                          ).map(_merged)
 
     # --- l'API : ecrire ----------------------------------------------------
 
@@ -310,7 +303,7 @@ class GitHub:
         return Result.of(self._ids[number])
 
     def create_issue(self, title: str, body: str = "",
-                     labels: tuple[str, ...] = ()) -> Result[Task]:
+                     labels: tuple[str, ...] = ()) -> Result[Issue]:
         args = ["-f", f"title={title}", "-f", f"body={body}"]
         for label in labels:
             args += ["-f", f"labels[]={label}"]
@@ -318,7 +311,7 @@ class GitHub:
                           *args)
         if got.failed:
             return got.recast()
-        task = _task(got.value)
+        task = _issue(got.value)
         self._ids[task.number] = int(got.value["id"])
         return Result.of(task)
 
@@ -327,8 +320,8 @@ class GitHub:
 
         Le round s'en sert pour la post-condition d'une task : GitHub ne
         ferme une issue liee qu'au merge dans la branche par defaut, et la
-        boucle merge ailleurs. `merged_pr_closing` fournit la preuve, cette
-        methode en tire la consequence. La migration s'en sert aussi.
+        boucle merge ailleurs. `merged_prs` fournit la matiere de la
+        preuve, cette methode en tire la consequence. La migration aussi.
         """
         return self._write(f"close #{number}", "PATCH",
                            f"issues/{number}", "-f", "state=closed")

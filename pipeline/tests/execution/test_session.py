@@ -16,7 +16,7 @@ from pipeline.adapters.store import resume
 from pipeline.runtime.filesystem.workspace import Workspace
 from pipeline.runtime.monitoring import logbook
 from pipeline.execution import session
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 from pipeline.domain.outcomes.result import Status
 from pipeline.adapters.agent import failure_reason

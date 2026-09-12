@@ -12,7 +12,7 @@ import datetime
 from pipeline.adapters.shell.github import GitHub
 from pipeline.adapters.store import ledger
 from pipeline.domain.outcomes.result import Result
-from pipeline.domain.pr_review import notes as review_notes
+from pipeline.workflows.pr_review.internals import notes as review_notes
 from pipeline.domain.prompts import prompt_builder as prompts
 from pipeline.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.pr_review.settings import ReviewConfig

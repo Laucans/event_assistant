@@ -26,8 +26,8 @@ from pathlib import Path
 
 from pipeline.adapters.shell.github import GitHub
 from pipeline.adapters.store import resume
-from pipeline.domain.legacy import migration
-from pipeline.domain.legacy.migration import NewIssue
+from pipeline.workflows.legacy import migration
+from pipeline.workflows.legacy.migration import NewIssue
 from pipeline.domain.outcomes.result import Result
 from pipeline.runtime.filesystem.workspace import Workspace
 from pipeline.workflows.common.utils import hub

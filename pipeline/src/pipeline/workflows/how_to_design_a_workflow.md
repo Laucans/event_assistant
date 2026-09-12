@@ -70,6 +70,8 @@ workflows/<ton_workflow>/
 ├── settings.py          ce qui varie d'un run à l'autre
 ├── preconditions.py     ce qui doit tenir avant de payer
 ├── postconditions.py    ce qu'il doit avoir obtenu (vide est valable)
+├── stages/              LA DÉFINITION : quels agents, quel modèle, quel texte
+│   └── __init__.py
 └── internals/           TOUT le reste
     └── __init__.py
 ```
@@ -80,6 +82,25 @@ cinquième fichier `.py` à la racine fait échouer
 échouer `test_every_workflow_carries_the_same_modules_at_its_root`. C'est
 volontairement rigide : c'est ce qui fait qu'on lit deux workflows de la même
 façon, et qu'un troisième se lit sans mode d'emploi.
+
+**Et deux sous-dossiers, pas trois.** `stages/` et `internals/`, nommés dans
+`WORKFLOW_DIRS` ; un troisième fait échouer
+`test_a_workflow_carries_no_subpackage_beyond_the_two_named_ones`. La règle
+existe parce que le test de la racine fait un `glob("*.py")` qui ne descend
+dans aucun dossier : sans elle, créer un sous-paquet ferait passer n'importe
+quoi.
+
+**`stages/` est ta définition, et c'est là que va tout ce qui décrit tes
+agents** — la table `PIPELINE` (une entrée `StageSpec` par stage, avec son
+modèle, son effort et sa prose), `INJECTOR`, et un module par texte long.
+Rien de ça ne va dans `domain/` : le domaine porte le *vocabulaire* (ce
+qu'est un `StageSpec`, une `Issue`, un `Result`), jamais l'instance. Deux
+tests le tiennent — `test_no_module_of_the_domain_names_a_workflow` et
+`test_only_its_own_workflow_names_the_pipeline_labels`.
+
+Si ton workflow n'a pas de table — les deux passes de `pr_review` tirent leur
+modèle de sa config, parce qu'ils sont réglables à l'appel — `stages/` ne
+porte que la prose. C'est un cas normal, dis-le dans son docstring.
 
 Les noms de **classes** ne sont pas contraints par un test, seulement les noms
 de modules. La convention en place est `<Nom>Preconditions` /
@@ -363,6 +384,9 @@ nom de module menteur.
 | --- | --- |
 | `test_every_workflow_carries_the_same_modules_at_its_root` | il manque un des quatre modules |
 | `test_every_workflow_keeps_its_own_code_in_internals` | un `.py` de trop à la racine — il va dans `internals/` |
+| `test_a_workflow_carries_no_subpackage_beyond_the_two_named_ones` | un sous-dossier hors de `stages/` et `internals/` |
+| `test_no_module_of_the_domain_names_a_workflow` | une définition de workflow rangée dans `domain/` |
+| `test_only_its_own_workflow_names_the_pipeline_labels` | une étiquette `pipeline:` sortie du workflow qui la définit |
 | `test_a_workflow_never_imports_another_workflow` | remonte ce que tu partages dans `common/` |
 | `test_the_common_package_never_imports_a_workflow` | le contrat s'est mis à connaître un implémenteur |
 | `test_every_layer_only_imports_the_layers_below_it` | un import qui remonte une couche |

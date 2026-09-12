@@ -13,7 +13,9 @@ Quatre regles paient leur place, et chacune a coute quelque chose :
   appel d'outil : un hook qui importerait le paquet rendrait la session
   inutilisable ;
 - **le domaine ne parle a personne**, ce qui est ce qui le rend testable en
-  lui passant des chaines ;
+  lui passant des chaines — et **il ne nomme aucun workflow** : il porte le
+  vocabulaire (ce qu'est un stage, une issue, un resultat), jamais la
+  definition d'un workflow, qui vit sous `workflows/<nom>/` ;
 - **tout workflow a la meme forme.** Les memes modules a sa racine, les memes
   classes dedans, et son code propre dans `internals/`. Un README qui le dit
   est vrai le jour ou il est ecrit ; le test plus bas le garde vrai.
@@ -232,6 +234,23 @@ NOT_A_WORKFLOW = {"common", "legacy"}
 ROOT_MODULES = ("workflow.py", "settings.py", "preconditions.py",
                 "postconditions.py")
 
+# Les sous-dossiers qu'un workflow a le droit de porter, et ce que chacun
+# veut dire. Nommes plutot que libres : `glob("*.py")` ne regarde pas dans
+# les dossiers, donc sans cette liste un nouveau sous-paquet echapperait en
+# silence a toute regle de forme — ce qui est exactement ce qui venait
+# d'arriver a `stages/`.
+#
+# `stages/` : la definition du workflow — quels stages il fait tourner, avec
+# quel modele et quel texte. C'est ce qu'on ouvre pour le changer.
+# `internals/` : sa mecanique, qui n'a pas a se ressembler d'un workflow a
+# l'autre.
+WORKFLOW_DIRS = {"stages", "internals"}
+
+# Les couches qui n'ont rien a savoir de ce qu'un workflow appelle une task.
+# Le launcher est exclu a dessein : c'est la couche d'usage, et son `--help`
+# parle a un humain de la boucle qu'il lance.
+BELOW_THE_WORKFLOWS = {"domain", "adapters", "execution", "runtime"}
+
 
 def workflow_packages() -> list[pathlib.Path]:
     """Les dossiers de `workflows/` qui sont des workflows."""
@@ -268,6 +287,84 @@ def test_every_workflow_keeps_its_own_code_in_internals():
     assert not faults, (
         "a la racine d'un workflow, mais ni contrat ni __init__ — "
         f"ils vont dans internals/ : {faults}")
+
+
+def test_a_workflow_carries_no_subpackage_beyond_the_two_named_ones():
+    """Un sous-dossier de plus echapperait a toute regle de forme.
+
+    `test_every_workflow_keeps_its_own_code_in_internals` fait un
+    `glob("*.py")` qui ne descend dans aucun dossier : sans ce test, creer
+    `workflows/<nom>/quelque_chose/` ferait passer n'importe quoi.
+    """
+    faults = []
+    for package in workflow_packages():
+        for child in sorted(package.iterdir()):
+            if (child.is_dir() and not child.name.startswith("__")
+                    and child.name not in WORKFLOW_DIRS):
+                faults.append(f"{package.name}/{child.name}/")
+    assert not faults, (
+        f"sous-dossier de workflow hors de {sorted(WORKFLOW_DIRS)} — "
+        f"nomme-le dans WORKFLOW_DIRS et dis ce qu'il veut dire : {faults}")
+
+
+# --- le domaine est du vocabulaire, pas une definition ---------------------
+#
+# Les deux tests qui portent la regle : `domain/` dit ce qu'un stage, une
+# issue et un resultat *sont* ; quels stages tournent, sous quelles
+# etiquettes et avec quel texte est la definition d'un workflow, et vit chez
+# lui. Ce sont des tests sur le **texte** des modules et non sur leurs
+# imports, parce que c'est le nommage qui trahit une instance qui remonte :
+# un module du domaine peut parfaitement citer "agentic_dev_loop" sans
+# l'importer, et il n'aurait deja plus rien a y faire.
+
+def workflow_names() -> list[str]:
+    return sorted(d.name for d in workflow_packages())
+
+
+def test_no_module_of_the_domain_names_a_workflow():
+    """Le vocabulaire ne connait aucun de ceux qui l'emploient.
+
+    Ce que ce test empeche de revenir : `domain/stages/`
+    `agentic_dev_loop_stages.py`, `domain/prompts/definitions/<workflow>/` et
+    `domain/pr_review/` — des instances rangees dans le vocabulaire, qui
+    faisaient du domaine le premier workflow avec les autres accroches
+    dessus.
+    """
+    faults = []
+    for path in sorted((SRC / "domain").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        faults += [f"{path.relative_to(SRC)} nomme {name!r}"
+                   for name in workflow_names() if name in text]
+    assert not faults, "le domaine nomme un workflow : %s" % faults
+
+
+def test_only_its_own_workflow_names_the_pipeline_labels():
+    """`pipeline:ready` ne veut rien dire pour une issue en general.
+
+    Les sept etiquettes sont la definition du round : elles vivent dans
+    `workflows/agentic_dev_loop/internals/tasks.py` et nulle part ailleurs.
+    L'adaptateur, en particulier, n'a jamais a savoir ce qu'une etiquette
+    signifie — il lit des issues, il ne decide pas.
+
+    La regle porte sur les couches **sous** `workflows/`. Le launcher est
+    l'autre bord : c'est la couche d'usage, son `--help` explique la boucle a
+    un humain et doit pouvoir nommer `pipeline:ready`. `workflows/legacy`
+    ecrit ces etiquettes — c'est son travail — et les importe du workflow.
+    """
+    home = "workflows/agentic_dev_loop/"
+    faults = []
+    for path in modules():
+        here = str(path.relative_to(SRC))
+        if layer(path) not in BELOW_THE_WORKFLOWS or here.startswith(home):
+            continue
+        if "pipeline:" in path.read_text(encoding="utf-8"):
+            faults.append(here)
+    assert not faults, (
+        f"les etiquettes pipeline: sont la definition du round, pas du"
+        f" vocabulaire — vues dans : {faults}")
+    # Le garde-fou du garde-fou : un scan qui ne trouve rien passerait partout.
+    assert "pipeline:" in (
+        SRC / home / "internals/tasks.py").read_text(encoding="utf-8")
 
 
 def test_a_workflow_never_imports_another_workflow():

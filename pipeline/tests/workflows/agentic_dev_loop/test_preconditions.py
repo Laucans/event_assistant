@@ -20,14 +20,14 @@ import types
 import pytest
 from conftest import milestone
 
-from pipeline.domain import tasks
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.runtime.filesystem.workspace import Workspace
 from pipeline.runtime.monitoring import logbook
 from pipeline.adapters.shell import binaries
 from pipeline.adapters.shell.git import Git
 from pipeline.workflows.agentic_dev_loop.preconditions import LoopPreconditions
-from pipeline.domain.stages.agentic_dev_loop_stages import PIPELINE
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
+from pipeline.workflows.agentic_dev_loop.stages import PIPELINE
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 from pipeline.workflows.common.utils import hub as adapters
 

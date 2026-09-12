@@ -7,8 +7,9 @@ ou on en est. Quatre lecteurs, une seule facon de lire.
 
 Ici et pas dans `adapters/` : composer « le milestone ouvert de plus petit
 numero, puis ses sous-issues, puis leurs bloqueurs » est une politique, et
-`adapters.shell.github` ne decide de rien. Ici et pas dans `domain/` : ca
-appelle `gh`. La fabrique de l'adaptateur, elle, a quitte ce module pour
+`adapters.shell.github` ne decide de rien. Ici et pas dans `tasks.py`, a
+cote : ce module appelle `gh`, et les regles de ce voisin se relisent en leur
+passant des issues. La fabrique de l'adaptateur, elle, a quitte ce module pour
 `common.utils.hub` — construire un client n'est la politique de personne, et
 `legacy.migrate` importait ce workflow-ci rien que pour l'obtenir.
 
@@ -22,9 +23,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from pipeline.adapters.shell.github import GitHub
-from pipeline.domain import tasks
+from pipeline.domain.issues import Issue
 from pipeline.domain.outcomes.result import Result
-from pipeline.domain.tasks import Task
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 
 
 @dataclass
@@ -38,24 +39,24 @@ class Board:
     """
 
     gh: GitHub
-    milestone: Task
-    tasks: list[Task] = field(default_factory=list)
+    milestone: Issue
+    tasks: list[Issue] = field(default_factory=list)
     # La task que le point de reprise designe, quand la boucle en a trouve
     # une. Elle prime sur le choix du tableau, et c'est ce qui permet de
     # finir un round dont le `/code` a deja merge : l'issue est fermee, donc
     # plus rien ne l'offrirait, et `/create-test` serait perdu.
-    resuming: Task | None = None
+    resuming: Issue | None = None
 
     @property
-    def open_agents(self) -> list[Task]:
+    def open_agents(self) -> list[Issue]:
         """Les tasks d'agent encore ouvertes — ce qui decide du rollover."""
         return tasks.open_agent_tasks(self.tasks)
 
     @property
-    def next(self) -> Task | None:
+    def next(self) -> Issue | None:
         return tasks.next_task(self.tasks)
 
-    def find(self, key: str | int) -> Task | None:
+    def find(self, key: str | int) -> Issue | None:
         """La sous-issue de ce milestone qui porte ce numero, ouverte ou non.
 
         Fermee comprise, a dessein : un round interrompu apres le merge de
@@ -80,7 +81,7 @@ class Board:
         head = (f"milestone {self.milestone.ref} has"
                 f" {len(self.open_agents)} open task(s) but none can run:\n"
                 f"{tasks.stuck_report(self.tasks)}\n")
-        if all(t.waiting_merge for t in self.open_agents):
+        if all(tasks.waiting_merge(t) for t in self.open_agents):
             return (head + "Everything is delivered on the integration"
                     " branch and waiting for you to merge it and close"
                     " these issues. Nothing here is the loop's to do.")

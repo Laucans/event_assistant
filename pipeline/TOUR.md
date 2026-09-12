@@ -73,29 +73,30 @@ ne doit jamais toucher**. La colonne « interdit » est celle qui porte le
 design — le §2 donne la règle grossière, ceci est le détail réel extrait de
 l'AST.
 
-### `domain/` — ce que la boucle *est*
+### `domain/` — le **vocabulaire** : ce qu'une chose *est*
 
 | Fichier | Rôle |
 | --- | --- |
-| `tasks.py` | **la pièce maîtresse.** Ce qu'est une task, et les 4 règles qui choisissent la suivante |
-| `stages/stage_spec.py` | `StageSpec` : un stage, son modèle, son effort. Générique |
-| `stages/agentic_dev_loop_stages.py` | `PIPELINE` : **la table, la surface de design** |
-| `prompts/prompt_builder.py` | le préambule, le bloc de portée, l'assemblage |
-| `prompts/definitions/<workflow>/` | un module par stage, une constante de prose chacun |
+| `issues.py` | ce qu'est une issue : numéro, titre, état, étiquettes, corps, bloqueurs |
+| `stage_spec.py` | `StageSpec` : un stage, son modèle, son effort, son texte. Plus `spec_of`/`names`, la lecture d'une table quelconque |
+| `prompts/prompt_builder.py` | le préambule, le bloc de portée, l'assemblage. **Aucune prose de stage** |
 | `outcomes/stage_result.py` | ce qu'un stage rend + les marqueurs `AGENT_LOOP_OK/STOP` |
 | `outcomes/result.py` | `Result[T]` : une valeur ou la raison de son absence, et ce que chaque statut vaut dehors |
 | `outcomes/exit_codes.py` | **les codes de sortie** (contrat public) |
-| `pr_review/notes.py` | le format du commentaire publié sur la PR |
-| `legacy/migration.py` | markdown → plan d'issues. Écrit pour être supprimé |
 
-**Dépend de** : lui-même, et de rien d'autre. `tasks.py` ne dépend de rien du
-tout ; `prompt_builder` → `definitions` ; `agentic_dev_loop_stages` →
-`stage_spec` ; `legacy/migration` → `tasks`.
+**Dépend de** : lui-même, et de rien d'autre. `issues.py` et `stage_spec.py`
+ne dépendent de rien du tout.
 **Interdit** : `runtime`, `adapters`, tout le reste — et par-dessus tout
 `subprocess`, `sqlite3`, `urllib`, le disque.
-**Pourquoi** : c'est ce qui permet de tester les quatre règles de choix d'une
-task en lui passant des objets `Task` construits à la main, sans réseau ni
-double.
+**Interdit aussi, et c'est la règle qui porte le découpage : nommer un
+workflow.** Pas d'import, et pas même une mention dans un commentaire —
+`test_no_module_of_the_domain_names_a_workflow` lit le texte des modules.
+Quels stages tournent, ce que `pipeline:ready` veut dire, quel texte reçoit
+/code : rien de tout ça n'est du vocabulaire, et tout ça vit sous
+`workflows/<nom>/`.
+**Pourquoi** : c'est ce qui permet à `execution/` de faire tourner n'importe
+quel stage sans connaître aucun workflow, et à `adapters/` de rendre des
+`Issue` sans savoir ce qu'une étiquette signifie.
 
 ### `runtime/` — le support qui ne décide de rien
 
@@ -132,8 +133,12 @@ graphe, les binaires, le disque.
 **Interdit** : `execution`, `workflows`, `launcher`.
 **Les deux confinements**, assertés : `crewai` n'existe que dans
 `engine/crewai_engine.py`, `claude_agent_sdk` que dans `agent/claude_sdk.py`.
-**À regarder** : `shell/github.py` importe `domain.tasks` — c'est le point
-(a) du §6.
+**Ce qu'il ne fait pas** : `shell/github.py` rend des `Issue` et ne sait pas
+ce qu'une étiquette signifie. `merged_prs(base)` rend les PR mergées ; quelle
+PR *vaut preuve de livraison* est la convention donnée à /code, et se décide
+dans `agentic_dev_loop/internals/tasks.py`. `test_only_its_own_workflow_names
+_the_pipeline_labels` l'assère : aucune étiquette `pipeline:` sous
+`workflows/`.
 
 ### `execution/` — la mécanique, générique par construction
 
@@ -166,8 +171,19 @@ aucun import ne relie `execution` à `workflows`, dans aucun sens.
 ├── settings.py        ce qui varie d'un run à l'autre
 ├── preconditions.py   ce qui doit tenir avant de payer
 ├── postconditions.py  ce qu'il doit avoir obtenu
-└── internals/         tout le reste — propre à ce workflow
+├── stages/            LA DÉFINITION — quels stages, quel modèle, quel texte
+└── internals/         la mécanique — propre à ce workflow
 ```
+
+Deux sous-dossiers, pas un de plus : `test_a_workflow_carries_no_subpackage_
+beyond_the_two_named_ones` l'assère, parce que `glob("*.py")` ne descend dans
+aucun dossier et qu'un troisième échapperait donc à toute règle de forme.
+
+**`stages/` est le fichier qu'on ouvre pour changer ce que le workflow
+fait.** `agentic_dev_loop/stages/` porte `PIPELINE` — une entrée par stage,
+avec son modèle, son effort et sa prose — plus `INJECTOR`, le nom que le
+préambule cite. `pr_review/stages/` ne porte que la prose : ses deux passes
+tirent leur modèle de `ReviewConfig`, parce qu'ils sont réglables à l'appel.
 
 `agentic_dev_loop/internals/` : `flow` (**le graphe : la séquence se lit
 ici**) · `gates` (ce qu'un **nœud** exige et doit obtenir) · `board` (le côté
@@ -247,8 +263,9 @@ n'importent que la **stdlib au niveau module**. Le routeur fait ses imports
 **dans la branche du switch**. Sans ça, un hook paierait l'import de crewai à
 chaque appel d'outil — et échouerait, puisqu'il tourne sous le python du
 système.
-`validation.py` ne dépend que de `domain.stages` et `routes` : pas d'I/O, pas
-d'environnement, elle reçoit la config déjà construite.
+`validation.py` ne dépend que de `domain.stage_spec` et `routes` : pas
+d'I/O, pas d'environnement, elle reçoit la config déjà construite — et pas
+un workflow, parce qu'elle lit la table qu'on lui passe, jamais la sienne.
 
 ---
 
@@ -403,9 +420,10 @@ issue pipeline:roadmap
 Quatre heures, dans cet ordre, et tu as le paquet :
 
 1. `tests/test_layering.py` — le contrat. 15 min.
-2. `domain/tasks.py` — le modèle et ses 4 règles. **Le fichier le plus dense
+2. `workflows/agentic_dev_loop/internals/tasks.py` — les étiquettes et les
+   4 règles. **Le fichier le plus dense
    en décisions du paquet.** 30 min.
-3. `domain/stages/agentic_dev_loop_stages.py` — la table. 5 min.
+3. `workflows/agentic_dev_loop/stages/__init__.py` — la table. 5 min.
 4. `domain/outcomes/result.py` — comment un arrêt voyage. 10 min.
 5. `workflows/common/contract/workflow.py` — la forme que tout workflow a,
    et les quinze lignes de `sequence()`. 15 min.
@@ -429,15 +447,7 @@ plomberie `gh api`), `adapters/agent/progress.py`, `runtime/monitoring/`,
 Rien ci-dessous ne casse une règle assertée. Ce sont les endroits où j'ai
 hésité, ou que je trouve discutables. Par ordre décroissant d'intérêt.
 
-**a. `adapters/shell/github.py:243` applique une règle métier.**
-`merged_pr_closing` appelle `closes(body, number)`, une regex qui vit dans
-`domain/tasks.py`. Un adaptateur est censé lire, pas décider ce qu'un corps
-de PR *signifie*. Défendable (la règle reste dans le domaine, l'adaptateur ne
-fait que l'appeler) ; discutable (l'adaptateur choisit **quand** l'appliquer,
-donc il filtre sur un critère métier). C'est le seul endroit du paquet où ça
-arrive.
-
-**b. `StagePolicy` n'est vérifié par rien.**
+**a. `StagePolicy` `StagePolicy` n'est vérifié par rien.**
 `execution/context.py` définit un `Protocol` structurel que `RunConfig` est
 censé satisfaire. Il n'y a **aucun type-checker** dans le projet (ni mypy ni
 pyright, ni dans `pyproject.toml` ni dans la CI). Renomme un champ de

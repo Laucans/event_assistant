@@ -11,8 +11,8 @@ celui que ces fichiers-la produisent.
 
 import textwrap
 
-from pipeline.domain.legacy import migration
-from pipeline.domain import tasks
+from pipeline.workflows.legacy import migration
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.runtime.filesystem.workspace import Workspace
 
 ROADMAP = textwrap.dedent("""\

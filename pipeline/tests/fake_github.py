@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import subprocess
 
-from pipeline.domain.tasks import LABELS
+from pipeline.workflows.agentic_dev_loop.internals.tasks import LABELS
 
 REPO = "o/r"
 

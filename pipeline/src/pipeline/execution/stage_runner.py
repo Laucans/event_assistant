@@ -16,7 +16,7 @@ from __future__ import annotations
 from pipeline.execution import session
 from pipeline.execution.context import Ctx, StagePolicy
 from pipeline.domain.outcomes.result import Result
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
 from pipeline.runtime.monitoring.logbook import Logbook
 
 

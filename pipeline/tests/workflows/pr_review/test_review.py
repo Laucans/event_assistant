@@ -22,8 +22,8 @@ from conftest import ORACLE, AssistantMessage, ToolUseBlock
 
 from pipeline.adapters.shell import github
 from pipeline.launcher.cli import pr_review as cli_review
-from pipeline.domain.pr_review import notes as review_notes
-from pipeline.domain.prompts.definitions.pr_review.brief import BRIEF_PROMPT
+from pipeline.workflows.pr_review.internals import notes as review_notes
+from pipeline.workflows.pr_review.stages import BRIEF_PROMPT
 from pipeline.runtime.filesystem.workspace import Workspace
 from pipeline.runtime.monitoring import logbook
 from pipeline.adapters.shell import binaries

@@ -41,14 +41,14 @@ from dataclasses import dataclass
 
 from pipeline.adapters.engine import (
     Flow, listen, persisted, quiet_panels, router, start)
-from pipeline.domain import tasks
 from pipeline.domain.prompts import prompt_builder as prompts
-from pipeline.domain.stages import agentic_dev_loop_stages as table
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain import stage_spec
+from pipeline.domain.stage_spec import StageSpec
 from pipeline.domain.outcomes.result import Result
 from pipeline.execution.context import Ctx
 from pipeline.execution.stage_runner import StageRunner
-from pipeline.workflows.agentic_dev_loop.internals import board, gates
+from pipeline.workflows.agentic_dev_loop.internals import board, gates, tasks
+from pipeline.workflows.agentic_dev_loop.stages import INJECTOR
 from pipeline.workflows.agentic_dev_loop.internals.board import Board
 from pipeline.workflows.agentic_dev_loop.internals.state import RoundState
 from pipeline.workflows.common.utils import hub
@@ -75,12 +75,12 @@ def _spec(pipeline: tuple[StageSpec, ...], skill: str) -> Result[StageSpec]:
     sans renommer le noeud : le message le dit, et nomme ce que la table
     contient reellement.
     """
-    spec = table.spec_of(skill, pipeline)
+    spec = stage_spec.spec_of(skill, pipeline)
     if spec is None:
         return Result.halt(f"PIPELINE has no {skill!r} entry, but the round"
                            f" graph runs one — the table in"
-                           f" domain/stages/agentic_dev_loop_stages.py names:"
-                           f" {table.names(pipeline)}")
+                           f" workflows/agentic_dev_loop/stages/ names:"
+                           f" {stage_spec.names(pipeline)}")
     return Result.of(spec)
 
 
@@ -94,12 +94,17 @@ def _scope(st: RoundState) -> str:
     return prompts.scope(
         milestone=st.milestone_num, milestone_title=st.milestone_title,
         milestone_body=st.milestone_body, num=st.task_num,
-        title=st.task_title, body=st.task_body)
+        title=st.task_title, body=st.task_body, injector=INJECTOR)
 
 
-def _extra(stage: str, st: RoundState) -> str:
-    """Les consignes de ce stage, plus la portee du round."""
-    return prompts.extra_for(stage, st.task_num, st.task_title,
+def _extra(stage: StageSpec, st: RoundState) -> str:
+    """Les consignes de ce stage, plus la portee du round.
+
+    Les consignes viennent de l'entree de table, pas d'un registre indexe par
+    nom : c'est ce qui fait qu'un stage renomme ne peut pas perdre son texte
+    en silence.
+    """
+    return prompts.extra_for(stage.instructions, st.task_num, st.task_title,
                              milestone=st.milestone_num, scope=_scope(st))
 
 
@@ -143,11 +148,11 @@ def _pick_task(ctx: RoundCtx, runner: StageRunner,
                 f" {tasks.AGENT} sub-issue — opening the next roadmap item")
         return Result.of(None)
     st.task_num, st.task_title = str(task.number), task.title
-    st.task_key, st.kind = task.key, task.kind
+    st.task_key, st.kind = task.key, tasks.kind(task)
     st.task_body = task.body
-    st.spec_written = task.spec_written
+    st.spec_written = tasks.spec_written(task)
     runner.about(task.key)
-    ctx.log(f"task {task.ref}: {task.title} [{task.kind}]")
+    ctx.log(f"task {task.ref}: {task.title} [{tasks.kind(task)}]")
     return Result.of(None)
 
 
@@ -163,7 +168,8 @@ async def _run_planner(ctx: RoundCtx, runner: StageRunner,
     # vide lui donnerait une task a chercher.
     ran = await runner.run(cfg.rollover, done=st.stages_done,
                            extra=prompts.extra_for(
-                               "planner", milestone=st.milestone_num))
+                               cfg.rollover.instructions,
+                               milestone=st.milestone_num))
     if ran.failed:
         return st.record(ran)
     if not cfg.dry_run:
@@ -194,7 +200,7 @@ async def _run_business_analyst(ctx: RoundCtx, runner: StageRunner,
                 f" — skipping /business-analyst (resuming a previous run)")
         return Result.of(None)
     ran = await runner.run(spec, done=st.stages_done,
-                           extra=_extra("business-analyst", st))
+                           extra=_extra(spec, st))
     if ran.failed:
         return st.record(ran)
     if not cfg.dry_run:
@@ -239,7 +245,8 @@ async def _run_code(ctx: RoundCtx, runner: StageRunner,
     has_spec = gates.code_has_a_spec(cfg, st.task_num, st.task_body)
     if has_spec.failed:
         return st.record(has_spec)
-    ran = await runner.run(spec, done=st.stages_done, extra=_extra("code", st))
+    ran = await runner.run(spec, done=st.stages_done,
+                           extra=_extra(spec, st))
     if ran.failed:
         return st.record(ran)
     return Result.of(None)
@@ -252,7 +259,7 @@ async def _run_create_test(ctx: RoundCtx, runner: StageRunner,
     if found.failed:
         return st.record(found)
     ran = await runner.run(found.value, done=st.stages_done,
-                           extra=_extra("create-test", st))
+                           extra=_extra(found.value, st))
     if ran.failed:
         return st.record(ran)
     return Result.of(None)
