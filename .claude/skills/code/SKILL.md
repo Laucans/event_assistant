@@ -1,19 +1,22 @@
 ---
 name: code
-description: Implement the task in docs/current/SPEC.md end to end — pre-flight gate against docs/current/HUMAN_ACTION_TRACKING.md, a checklist from the spec's Approach, the build, every Verification bullet run with real output, /code-review, then branch → PR → gh pr merge --rebase. Use when a spec is ready to build, when starting the implementation stage of the docs pipeline, or when the user says "/code", "implement the spec", "start coding the task", "build what the spec says", or "you are code".
+description: Implement the task whose SPEC is the body of its pipeline:agent issue, end to end — pre-flight gate (open pipeline:human blockers, dirty working tree, stale assumptions, missing inputs), a checklist from the spec's Approach, the build, every Verification bullet run with real output, /code-review, then branch → PR carrying `Closes #N` → gh pr merge --rebase. Use when a spec is ready to build, when starting the implementation stage of the pipeline, or when the user says "/code", "implement the spec", "start coding the task", "build what the spec says", or "you are code".
 ---
 
 # Role: Implementer
 
-You take the single task described in `docs/current/SPEC.md` and land it:
-pre-flight gate, plan, build, verify with real output, review, PR, merge.
+You take the single task described in the body of its `pipeline:agent`
+issue and land it: pre-flight gate, plan, build, verify with real output,
+review, PR, merge. **The issue body is the SPEC** — there is no
+`docs/current/`, and nothing else describes the task.
 
-You do **not** write specs (`/business-analyst`), do **not** re-plan the
-milestone (`/planner`), and do **not** archive (`/archive-instructions`).
-If `docs/current/SPEC.md` is missing, say so and point at
+You do **not** write specs (`/business-analyst`) and do **not** re-plan the
+milestone (`/planner`). If the issue body is empty, say so and point at
 `/business-analyst` — never reconstruct the task yourself.
 
-The SPEC is the contract. Your job is to execute it, not to improve it.
+The SPEC is the contract. Your job is to execute it, not to improve it. It
+ends closed: the PR you merge carries `Closes #N`, and GitHub closing that
+issue is the only thing that marks this task done.
 
 ## 1. Read first
 
@@ -24,16 +27,15 @@ section for the bullets you'll have to run, and go to section 4.
 
 Otherwise (a human ran `/code` on its own) read:
 
-- `docs/current/SPEC.md` — the contract: `Problem` (including the stop
+- **The task issue body** — the contract: `Problem` (including the stop
   line), `Goals / Non-goals`, `Approach`, `Files & interfaces touched`,
-  `Edge cases`, `Out of scope`, `Verification`.
-- `docs/current/HUMAN_ACTION.md` — the committed short list.
-- `docs/current/HUMAN_ACTION_TRACKING.md` — **read-only.** It carries the
-  human's live ticks, rationale and notes. Read it before claiming to be
-  blocked, and **never write a tick into it** — the ticks are the human's
-  (`CLAUDE.md`, Workflow).
-- `docs/current/CURRENT_MILESTONE.md` — which numbered task this is and
-  what the following tasks are entitled to take.
+  `Edge cases`, `Out of scope`, `Verification`, `Human actions`. In a loop
+  run it is already in your prompt under `SCOPE`, with the milestone body;
+  otherwise `gh issue view <n>` and `gh issue view <milestone>`.
+- **What blocks the issue** —
+  `gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocked_by --jq '.[]|"\(.number) \(.state) \(.title)"'`.
+  An open `pipeline:human` blocker is the human gate, and it is the whole
+  gate; you never close one.
 - Every file named in the SPEC's `Files & interfaces touched`, before
   editing any of them.
 
@@ -44,18 +46,19 @@ you there — a spec is written to be self-contained for a fresh session.
 
 **If a `/tech-analyst` plan is already in context**, this gate has been run
 — adopt its four findings as they stand rather than re-deriving them, and
-act on them: an open *Before Claude starts* item still blocks, and its
+act on them: an open `pipeline:human` blocker still blocks, and its
 dirty-file list is the one you spend in section 7. Re-run only a check
 whose answer could have changed since.
 
 Otherwise, report all four findings yourself, then wait for a go-ahead.
 Nothing is edited before this.
 
-- **Blocking human actions.** Quote every `- [ ]` item under *Before
-  Claude starts* in `HUMAN_ACTION_TRACKING.md`. If any is open, stop —
-  those block by construction. Items under *While Claude works* and
-  *Before calling it done* are **not** blockers for starting; name them so
-  the human knows what's coming, then carry on.
+- **Blocking human actions.** List the issue's `blocked_by` issues with
+  their state. If any is still open, stop and quote it — an open
+  `pipeline:human` issue blocks by construction, and the loop would not
+  have offered you this task. The SPEC's `Human actions` lines for *while
+  Claude works* and *before merging* are **not** blockers for starting;
+  name them so the human knows what's coming, then carry on.
 - **Working tree.** Run `git status --short` and name every dirty file
   that predates this task. You need that list at commit time: the Supabase
   spec, for example, starts with `.claude/settings.json` modified by
@@ -156,23 +159,29 @@ push are a backstop, not something to test.
    `git diff --cached --name-only` before committing.
 3. Commit per `/commit`'s conventions. Never commit secrets; every new env
    var is documented in the committed `.env.example`.
-4. `gh pr create`, wait for `ci` with `gh pr checks`, then
-   `gh pr merge --rebase` — the only method enabled; the branch
-   auto-deletes.
+4. `gh pr create` with **`Closes #<n>` on its own line in the body** —
+   the issue number of the task. That line is what closes the task: no
+   `Closes`, no closed issue, and the loop stops rather than replay a task
+   that still looks open.
+5. Wait for `ci` with `gh pr checks`, then `gh pr merge --rebase` — the
+   only method enabled; the branch auto-deletes.
+6. Confirm GitHub did close it: `gh issue view <n> --json state`. Nobody
+   closes it by hand, so a PR merged without the `Closes` line leaves the
+   task open and the round unfinished.
 
 ## 8. Edge cases
 
-- **No `docs/current/SPEC.md`.** Stop and say `/business-analyst` writes
-  it. Do not build from `CURRENT_MILESTONE.md` directly.
+- **The issue body is empty** (the scope block says so in words). Stop
+  and say `/business-analyst` writes the SPEC there. Do not build from the
+  milestone body or the issue title.
 - **Already implemented.** If the working tree or `git log` shows the
   SPEC's artifacts already landed, report what exists and which
   Verification bullets confirm it — don't redo the work.
-- **A *Before Claude starts* item is still unticked.** You are blocked.
-  Quote it and stop — the tracking file is where you check, not where you
-  tick.
-- **The two human-action files disagree** (an item ticked in one, open in
-  the other — the live Supabase pair does exactly this). Ask which is
-  current instead of taking the convenient reading.
+- **A `pipeline:human` blocker is still open.** You are blocked. Quote it
+  and stop — closing it is the human's move, never yours.
+- **The SPEC and the milestone body disagree** on what this task covers.
+  The task issue is the contract; say the milestone contradicts it rather
+  than taking the convenient reading.
 - **The SPEC contradicts `CLAUDE.md`.** `CLAUDE.md` wins on repository
   etiquette and on the constraints that aren't visible in the code. Flag
   the contradiction; don't silently pick a side.
@@ -195,8 +204,9 @@ End by telling the user:
 - each Verification bullet with its result and the output proving it,
   including anything **not run** and why;
 - anything left undone, and the named later task it belongs to;
-- which *Before calling it done* items in
-  `docs/current/HUMAN_ACTION_TRACKING.md` are theirs to tick — not yours;
-- to run `/archive-instructions` next.
+- the SPEC's *before merging* human actions — theirs to run, not yours;
+- that issue #n is closed (or, if it isn't, that the `Closes` line is
+  missing and the task is not done).
 
-This skill never ticks the tracking file and never archives.
+This skill never closes an issue by hand and never touches a
+`pipeline:` label.

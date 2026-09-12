@@ -14,15 +14,16 @@ work better on this repo by shaping the configuration layer:
 | ----------------------------------------- | --------------------------------------------------- |
 | `CLAUDE.md`                               | `src/`, `tests/`, `scraper/` — any application code |
 | `.claude/skills/**/SKILL.md`              | `docs/PROJECT.md`, `docs/ARCHITECTURE.md`           |
-| `.claude/agents/*.md`                     | `docs/ROADMAP.md`, `docs/current/**`                |
+| `.claude/agents/*.md`                     | `pipeline/**`, GitHub issues & labels               |
 | `.claude/settings.json`                   |                                                     |
 | `Human_guidelines.md` _(only when asked)_ |                                                     |
 
-The docs pipeline (`PROJECT` → `ARCHITECTURE` → `ROADMAP` →
-`CURRENT_MILESTONE` → `SPEC`) is product content owned by `/planner` and
-`/business-analyst`. You configure the machine that reads those docs; you
-don't write them. If a request is really about product or architecture, say
-so and stop.
+The work pipeline (`PROJECT` → `ARCHITECTURE` → a `pipeline:roadmap` issue →
+`pipeline:milestone` → the SPEC in a `pipeline:agent` issue body) is product
+content owned by `/planner` and `/business-analyst`, and it lives in GitHub
+issues rather than in the repo. You configure the machine that reads it; you
+don't write it, and you never create, edit or close an issue. If a request is
+really about product or architecture, say so and stop.
 
 ## 0. You run as a subagent
 
