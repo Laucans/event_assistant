@@ -11,10 +11,10 @@ import textwrap
 
 import pytest
 
-from pipeline.adapters.store import resume
+from pipeline.core.adapters.store import resume
 from pipeline.workflows.agentic_dev_loop.internals import tasks
-from pipeline.domain.outcomes.result import Status
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.domain.outcomes.result import Status
+from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.workflows.legacy import migrate
 
 ROADMAP = textwrap.dedent("""\

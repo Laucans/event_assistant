@@ -24,11 +24,11 @@ os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
 # *dans* la revue ne doivent pas en declencher une seconde.
 os.environ["PR_REVIEW_ACTIVE"] = "1"
 
-from pipeline.domain.outcomes.exit_codes import (  # noqa: E402
+from pipeline.core.domain.outcomes.exit_codes import (  # noqa: E402
     EXIT_CRASH, EXIT_INTERRUPTED)
-from pipeline.runtime.filesystem.workspace import Workspace  # noqa: E402
-from pipeline.runtime.monitoring import logbook  # noqa: E402
-from pipeline.runtime.monitoring.logbook import Logbook  # noqa: E402
+from pipeline.core.runtime.filesystem.workspace import Workspace  # noqa: E402
+from pipeline.core.runtime.monitoring import logbook  # noqa: E402
+from pipeline.core.runtime.monitoring.logbook import Logbook  # noqa: E402
 from pipeline.workflows.pr_review.settings import ReviewConfig  # noqa: E402
 from pipeline.workflows.pr_review.workflow import PrReview  # noqa: E402
 

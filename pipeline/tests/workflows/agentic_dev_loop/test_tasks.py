@@ -12,7 +12,7 @@ l'entree qui declenche un `/planner` a plusieurs dollars.
 
 import pytest
 
-from pipeline.domain.issues import Issue
+from pipeline.core.domain.issues import Issue
 from pipeline.workflows.agentic_dev_loop.internals import tasks
 
 

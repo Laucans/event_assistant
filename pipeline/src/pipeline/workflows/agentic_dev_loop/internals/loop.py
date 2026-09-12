@@ -17,10 +17,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipeline.adapters.store import resume
-from pipeline.domain.outcomes.result import Result
-from pipeline.runtime.monitoring import metrics
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.adapters.store import resume
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.runtime.monitoring import metrics
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.agentic_dev_loop.internals import board
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 from pipeline.workflows.common.contract.outcome import WorkflowOutcome

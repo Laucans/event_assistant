@@ -206,7 +206,7 @@ Elles ne se rouvrent pas au cas par cas. Chacune a un test derrière.
 
 ### Les arrêts sont des valeurs, pas des exceptions
 
-`domain/outcomes/result.py` porte `Result[T]` : une valeur, ou la raison de
+`core/domain/outcomes/result.py` porte `Result[T]` : une valeur, ou la raison de
 son absence. Rien dans ce paquet ne lève pour s'arrêter.
 
 ```python
@@ -411,7 +411,7 @@ Dans cet ordre, une heure :
 
 1. `common/contract/workflow.py` — le contrat, et les quinze lignes de
    `sequence()`. C'est tout ce que tu dois respecter.
-2. `domain/outcomes/result.py` — comment un arrêt voyage.
+2. `core/domain/outcomes/result.py` — comment un arrêt voyage.
 3. `pr_review/` en entier — c'est le plus petit des deux, et il montre la
    forme complète sans moteur de graphe. **Copie celui-là.**
 4. `agentic_dev_loop/internals/flow.py` — seulement si ton workflow est un

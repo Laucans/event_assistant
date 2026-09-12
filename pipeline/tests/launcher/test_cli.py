@@ -8,15 +8,15 @@ import types
 import pytest
 from conftest import milestone
 
-from pipeline.adapters.store import resume
-from pipeline.execution import session
+from pipeline.core.adapters.store import resume
+from pipeline.core.execution import session
 from pipeline.workflows.agentic_dev_loop.internals import loop as workflow_loop
 from pipeline.workflows.common.contract.outcome import WorkflowOutcome
 from pipeline.launcher.cli import agentic_dev_loop as loop
-from pipeline.runtime.filesystem.workspace import Workspace
-from pipeline.runtime.monitoring import logbook
+from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.monitoring import logbook
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
-from pipeline.domain.outcomes.result import Result
+from pipeline.core.domain.outcomes.result import Result
 
 ROOT = Workspace.here().root
 

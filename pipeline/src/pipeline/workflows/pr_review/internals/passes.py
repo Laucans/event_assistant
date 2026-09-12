@@ -9,13 +9,13 @@ redaction, pas une chasse.
 
 from __future__ import annotations
 
-from pipeline.adapters.agent import AgentRunner, default_runner, progress
-from pipeline.adapters.store import envelope, ledger
-from pipeline.domain.outcomes.result import Result
-from pipeline.domain.prompts import prompt_builder as prompts
+from pipeline.core.adapters.agent import AgentRunner, default_runner, progress
+from pipeline.core.adapters.store import envelope, ledger
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.domain.prompts import prompt_builder as prompts
 from pipeline.workflows.pr_review.stages import BRIEF_PROMPT
-from pipeline.runtime.filesystem.workspace import Workspace
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.pr_review.internals.pr import Pr
 from pipeline.workflows.pr_review.settings import ReviewConfig
 

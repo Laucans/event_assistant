@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.domain.outcomes.result import Result
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 from pipeline.workflows.common.contract.outcome import WorkflowOutcome
 

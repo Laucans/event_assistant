@@ -72,7 +72,7 @@ lui, sans jamais voir ce qui vient d'être planifié. Le round le dit avec ces
 mots-là si ça arrive.
 
 `gh` n'a de flag natif ni pour les sous-issues ni pour les dépendances : tout
-passe par `gh api`, dans `adapters/shell/github.py`.
+passe par `gh api`, dans `core/adapters/shell/github.py`.
 
 ### La bascule
 
@@ -102,21 +102,30 @@ Le paquet est rangé en couches, et le sens des dépendances ne remonte jamais.
 vérifiée en parcourant l'AST de chaque fichier, imports tardifs compris.
 
 ```
-launcher/   les points d'entrée : un routeur, les commandes, les hooks
-workflows/  un sous-paquet par workflow, tous de la même forme
+launcher/   le déclenchement : un routeur, les commandes, les hooks
+workflows/  la définition : un sous-paquet par workflow, même forme partout
             (common/ porte le contrat et ce qu'ils réutilisent)
-execution/  faire tourner un stage, sans rien savoir du workflow
-adapters/   tout composant externe, emballé derrière une interface à nous
-runtime/    chemins, journal, mesures — une feuille, comme domain/
-domain/     le vocabulaire pur : ce qu'est un stage, une issue, un arrêt
+core/       le framework : ce qui ne sait rien d'aucun workflow
+  execution/  faire tourner un stage, sans rien savoir du workflow
+  adapters/   tout composant externe, emballé derrière une interface à nous
+  runtime/    chemins, journal, mesures — une feuille, comme domain/
+  domain/     le vocabulaire pur : ce qu'est un stage, une issue, un arrêt
 ```
+
+**Rien sous `core/` n'importe `workflows/` ni `launcher/`** — c'est la
+règle qui justifie le dossier, et elle tient en une assertion là où il
+fallait sinon la lire dans quatre lignes de la table `ALLOWED`. Les quatre
+couches de `core/` restent des couches à part entière : la table les nomme
+`core/domain`, `core/runtime`, `core/adapters`, `core/execution`, sans quoi
+`domain` pourrait importer `execution` sans que rien ne bronche.
 
 `domain/` et `runtime/` sont rangés en sous-paquets — `domain/prompts/`,
 `domain/outcomes/` ; `runtime/monitoring/`, `runtime/filesystem/`. Les
 `__init__.py` de ces sous-paquets ne ré-exportent rien : un appelant écrit
-le chemin complet (`from pipeline.domain.outcomes.result import Result`).
+le chemin complet (`from pipeline.core.domain.outcomes.result import
+Result`).
 
-### `domain/` — le **vocabulaire**, pas la définition
+### `core/domain/` — le **vocabulaire**, pas la définition
 
 Aucun I/O, aucun subprocess, aucune bibliothèque externe. C'est ce qui rend
 ces décisions testables en leur passant des chaînes de caractères.
@@ -147,7 +156,7 @@ première, et un stage renommé d'un côté perdait son texte de l'autre, en
 silence. Un stage sans consigne a simplement la chaîne vide — c'est le cas
 de `create-test`, qui travaille contre un spec déjà écrit.
 
-### `adapters/` — l'extérieur, emballé
+### `core/adapters/` — l'extérieur, emballé
 
 | Module | Rôle |
 | --- | --- |
@@ -160,7 +169,7 @@ de `create-test`, qui travaille contre un spec déjà écrit.
 | `store/resume.py` | le point de reprise : pointeur lisible + lecture sqlite du magasin |
 | `store/envelope.py` | l'enveloppe JSON qu'un stage ou une passe laisse derrière |
 
-### `execution/` — faire tourner un stage
+### `core/execution/` — faire tourner un stage
 
 Générique : rien ici n'importe un workflow, et le test de couches l'assère.
 
@@ -211,7 +220,7 @@ un workflow qui en importe un autre, les fait échouer.
 | `legacy/migrate.py` | la bascule du markdown vers les issues, une fois. **N'est pas un workflow** : elle meurt entière, et le scan de forme l'exempte explicitement |
 
 On relit `internals/flow.py` pour comprendre le pipeline,
-`execution/stage_runner.py` pour comprendre une panne. C'est pour ça qu'ils
+`core/execution/stage_runner.py` pour comprendre une panne. C'est pour ça qu'ils
 sont séparés.
 
 `board.py` est lu par quatre appelants — le round, la boucle, le préflight et
@@ -222,7 +231,7 @@ round est **tardif**, dans le corps d'`execute()`.
 
 ### Les arrêts sont des valeurs, pas des exceptions
 
-`domain/outcomes/result.py` porte `Result[T]` : une valeur, ou la raison de
+`core/domain/outcomes/result.py` porte `Result[T]` : une valeur, ou la raison de
 son absence. Une porte de préflight, une lecture d'API qui n'aboutit pas, un
 stage qui répond `AGENT_LOOP_STOP` — chacun **rend** un échec que son
 appelant propage (`recast()`, `map()`, `but()`). Le chemin d'arrêt est donc
@@ -245,7 +254,7 @@ laisserait partir `/create-test` : une session payante de plus, sur une task
 qu'on vient de renoncer à livrer. Deux tests l'asserent ; les retirer les
 fait échouer.
 
-### `runtime/` et `launcher/`
+### `core/runtime/` et `launcher/`
 
 `runtime/` n'importe **rien** du paquet — c'est une feuille au même titre que
 `domain/`, et le test de couches l'assère. `RunConfig` y a vécu un temps : ses
@@ -262,10 +271,10 @@ d'entrée la résolvent une fois, et les chemins rapides dans leur branche.
 
 | Module | Rôle |
 | --- | --- |
-| `runtime/filesystem/paths.py` | la racine du dépôt, résolue à la première lecture |
-| `runtime/filesystem/workspace.py` | une racine, et les chemins que la boucle en dérive |
-| `runtime/monitoring/logbook.py` | le journal : niveaux, date, contexte — **le seul système de log** |
-| `runtime/monitoring/metrics.py` | durées, tokens, ratio de cache, cumul par round et par run |
+| `core/runtime/filesystem/paths.py` | la racine du dépôt, résolue à la première lecture |
+| `core/runtime/filesystem/workspace.py` | une racine, et les chemins que la boucle en dérive |
+| `core/runtime/monitoring/logbook.py` | le journal : niveaux, date, contexte — **le seul système de log** |
+| `core/runtime/monitoring/metrics.py` | durées, tokens, ratio de cache, cumul par round et par run |
 | `launcher/main.py` | **le routeur** : il lit argv, valide, et dispatche |
 | `launcher/routes.py` | la table des routes : nom, protocole, module cible, règles |
 | `launcher/validation.py` | les règles inter-arguments, par route — une fonction pure |
@@ -330,7 +339,7 @@ Trois règles, et chacune a coûté quelque chose.
 
 `crewai` coûte ~1,3 s d'import à chaud et tire `chromadb`, `openai` et
 `opentelemetry` — 2331 modules. Il n'existe donc que dans
-`adapters/engine/crewai_engine.py`, chargé sur le seul chemin d'un run réel.
+`core/adapters/engine/crewai_engine.py`, chargé sur le seul chemin d'un run réel.
 
 - `--status` et `--costs` répondent en ~0,08 s, sans crewai ni SDK. Deux
   tests le vérifient : `test_the_fast_paths_never_import_crewai_or_the_sdk`
@@ -342,11 +351,11 @@ Trois règles, et chacune a coûté quelque chose.
   branche du switch, et un test l'assère **au niveau module**. Un
   `from pipeline.x import y` remonté en tête de `main.py` casserait les
   quatre hooks du dépôt d'un coup.
-- Le **SDK** n'existe que dans `adapters/agent/claude_sdk.py`. Ailleurs on
+- Le **SDK** n'existe que dans `core/adapters/agent/claude_sdk.py`. Ailleurs on
   parle à `AgentRunner` et on lit un `AgentResult` — aucun nom de champ
   d'Anthropic ne circule dans `workflows/`. C'est ce qui rendra une seconde
   implémentation possible sans toucher au round ni à la revue.
-- `runtime/monitoring/logbook.py` et `adapters/agent/progress.py` sont eux
+- `core/runtime/monitoring/logbook.py` et `core/adapters/agent/progress.py` sont eux
   aussi en
   bibliothèque standard : le premier est sur le chemin rapide, et le second
   classe les messages du SDK **par nom de classe** plutôt qu'en l'important —
@@ -356,7 +365,7 @@ Trois règles, et chacune a coûté quelque chose.
 ### La lecture du magasin de reprise, et pourquoi elle est là où elle est
 
 crewai **écrit** `flow_states` via son `@persist`, mais c'est
-`adapters/store/resume.py` qui le **relit**, en sqlite3 standard. Le schéma
+`core/adapters/store/resume.py` qui le **relit**, en sqlite3 standard. Le schéma
 est donc connu des deux côtés, et c'est assumé : `--status` doit répondre
 sans payer l'import du moteur. C'est le seul couplage de ce genre dans le
 paquet, et il est nommé dans la docstring du module.

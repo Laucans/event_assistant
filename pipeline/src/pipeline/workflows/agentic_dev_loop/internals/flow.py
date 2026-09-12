@@ -39,14 +39,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.adapters.engine import (
+from pipeline.core.adapters.engine import (
     Flow, listen, persisted, quiet_panels, router, start)
-from pipeline.domain.prompts import prompt_builder as prompts
-from pipeline.domain import stage_spec
-from pipeline.domain.stage_spec import StageSpec
-from pipeline.domain.outcomes.result import Result
-from pipeline.execution.context import Ctx
-from pipeline.execution.stage_runner import StageRunner
+from pipeline.core.domain.prompts import prompt_builder as prompts
+from pipeline.core.domain import stage_spec
+from pipeline.core.domain.stage_spec import StageSpec
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.execution.context import Ctx
+from pipeline.core.execution.stage_runner import StageRunner
 from pipeline.workflows.agentic_dev_loop.internals import board, gates, tasks
 from pipeline.workflows.agentic_dev_loop.stages import INJECTOR
 from pipeline.workflows.agentic_dev_loop.internals.board import Board

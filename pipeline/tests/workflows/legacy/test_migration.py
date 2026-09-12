@@ -13,7 +13,7 @@ import textwrap
 
 from pipeline.workflows.legacy import migration
 from pipeline.workflows.agentic_dev_loop.internals import tasks
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.filesystem.workspace import Workspace
 
 ROADMAP = textwrap.dedent("""\
     # Roadmap

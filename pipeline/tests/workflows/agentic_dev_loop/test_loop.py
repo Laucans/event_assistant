@@ -11,9 +11,9 @@ import asyncio
 import pytest
 from conftest import milestone
 
-from pipeline.runtime.filesystem.workspace import Workspace
-from pipeline.runtime.monitoring import logbook
-from pipeline.domain.outcomes.result import Result
+from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.monitoring import logbook
+from pipeline.core.domain.outcomes.result import Result
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 from pipeline.workflows.agentic_dev_loop.internals import loop as workflow_loop
 
@@ -117,7 +117,7 @@ def test_a_rollover_that_opened_a_task_lets_the_loop_carry_on(local, hub,
 
     from pipeline.workflows.agentic_dev_loop import stages as table
     from pipeline.workflows.agentic_dev_loop.internals import tasks
-    from pipeline.execution import session
+    from pipeline.core.execution import session
 
     async def planner_opens_one(stage, cfg, **kw):
         hub.link(number, hub.add("Une nouvelle task", tasks.AGENT))
@@ -134,8 +134,8 @@ def test_a_rollover_that_opened_a_task_lets_the_loop_carry_on(local, hub,
 def test_the_resume_pointer_is_keyed_by_the_issue_number(local, hub,
                                                          monkeypatch):
     """Un titre reecrit changeait la cle et faisait repayer la task."""
-    from pipeline.adapters.store import resume
-    from pipeline.execution import session
+    from pipeline.core.adapters.store import resume
+    from pipeline.core.execution import session
 
     number, numbers = milestone(hub, ready=(0,), tasks=("Une task",))
 
@@ -158,7 +158,7 @@ def test_a_dry_run_with_restart_keeps_the_resume_point_it_describes(
     Les deux autres ecritures du magasin dans `one_round` sont deja gardees
     par `dry_run` ; celle de `--restart` ne l'etait pas.
     """
-    from pipeline.adapters.store import resume
+    from pipeline.core.adapters.store import resume
 
     number, numbers = milestone(hub, ready=(0,), tasks=("Une task",))
     resume.write_pointer(str(numbers[0]), "un-flow", local.state)

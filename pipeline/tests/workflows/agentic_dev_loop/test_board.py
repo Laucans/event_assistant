@@ -12,8 +12,8 @@ from pathlib import Path
 from conftest import milestone
 
 from pipeline.workflows.agentic_dev_loop.internals import tasks
-from pipeline.domain.outcomes.result import Status
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.domain.outcomes.result import Status
+from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.workflows.agentic_dev_loop.internals import board
 from pipeline.workflows.common.utils import hub as adapters
 

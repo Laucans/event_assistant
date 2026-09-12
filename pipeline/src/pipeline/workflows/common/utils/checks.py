@@ -24,10 +24,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from pipeline.adapters.shell import binaries
-from pipeline.domain.outcomes.result import Result
-from pipeline.runtime.filesystem.workspace import Workspace
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.adapters.shell import binaries
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.common.utils import hub
 
 

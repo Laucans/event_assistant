@@ -20,13 +20,13 @@ import types
 import pytest
 from conftest import ORACLE, AssistantMessage, ToolUseBlock
 
-from pipeline.adapters.shell import github
+from pipeline.core.adapters.shell import github
 from pipeline.launcher.cli import pr_review as cli_review
 from pipeline.workflows.pr_review.internals import notes as review_notes
 from pipeline.workflows.pr_review.stages import BRIEF_PROMPT
-from pipeline.runtime.filesystem.workspace import Workspace
-from pipeline.runtime.monitoring import logbook
-from pipeline.adapters.shell import binaries
+from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.monitoring import logbook
+from pipeline.core.adapters.shell import binaries
 from pipeline.workflows.common.utils import hub as adapters
 from pipeline.workflows.pr_review.internals import passes as passes_mod
 

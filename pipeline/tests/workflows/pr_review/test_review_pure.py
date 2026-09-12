@@ -74,7 +74,7 @@ def test_only_a_real_failure_names_the_subtype():
 
 
 def test_every_level_the_table_names_is_one_the_journal_has():
-    from pipeline.runtime.monitoring import logbook
+    from pipeline.core.runtime.monitoring import logbook
     log = logbook.null()
     for level, _ in PASS_FAILURES.values():
         assert callable(getattr(log, level))

@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import re
 
-from pipeline.domain.issues import Issue
+from pipeline.core.domain.issues import Issue
 
 # Les etiquettes qui portent tout le modele. Elles sont creees a la main sur
 # le depot, et `workflows.agentic_dev_loop.preconditions` verifie qu'elles

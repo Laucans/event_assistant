@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from pipeline.domain.outcomes.result import Result
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.common.contract.outcome import WorkflowOutcome
 from pipeline.workflows.common.contract.settings import WorkflowConfig
 

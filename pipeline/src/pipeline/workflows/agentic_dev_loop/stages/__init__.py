@@ -28,7 +28,7 @@ Metier pur : ce module ne lit ni l'environnement, ni le disque, ni git.
 
 from __future__ import annotations
 
-from pipeline.domain.stage_spec import StageSpec
+from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.workflows.agentic_dev_loop.stages.business_analyst import (
     BUSINESS_ANALYST)
 from pipeline.workflows.agentic_dev_loop.stages.code import CODE

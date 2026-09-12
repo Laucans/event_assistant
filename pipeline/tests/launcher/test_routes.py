@@ -9,7 +9,7 @@ import pytest
 
 from pipeline.launcher import routes, validation
 from pipeline.launcher.main import main
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.filesystem.workspace import Workspace
 
 ROOT = Workspace.here().root
 SRC = ROOT / "pipeline/src"
