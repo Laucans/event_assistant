@@ -11,7 +11,7 @@ from conftest import ORACLE, milestone
 
 from pipeline.adapters.store import ledger, resume
 from pipeline.launcher.cli import reports
-from pipeline.domain import tasks
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.runtime.filesystem.workspace import Workspace
 
 

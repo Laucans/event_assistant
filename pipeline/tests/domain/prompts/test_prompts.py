@@ -10,8 +10,10 @@ Three differences are intended and named:
   prompt can no longer claim otherwise;
 - the per-stage instructions of `code`, which now name a GitHub issue and the
   `Closes #N` line that closes it. There is nothing in the shell's text to
-  compare that to, so what is compared is the half that must not move: the
-  preamble, byte for byte, and the composition around it;
+  compare that to, so what is compared here is the half that must not move:
+  the preamble, byte for byte, and the composition around it. Le texte des
+  stages, lui, appartient au workflow et se teste chez lui —
+  `workflows/agentic_dev_loop/test_stage_prompts.py` ;
 - one clause of rule 1, which named `/archive-instructions steps 3 and 7`.
   That skill is deleted, so the rule pointed at nothing. The clause was cut
   from the source **and** from the oracle files in the same edit, which is
@@ -27,7 +29,6 @@ are unchanged.
 import pytest
 from conftest import ORACLE
 
-from pipeline.domain.prompts import definitions
 from pipeline.domain.prompts import prompt_builder as prompts
 
 BRANCH = "main_agent"
@@ -58,20 +59,6 @@ def test_prompt_still_matches_the_shell_to_the_byte(stage, lead, extra):
     assert built == oracle(stage)
 
 
-def test_the_code_prompt_keeps_the_shells_preamble_word_for_word():
-    """Seules les consignes du stage ont bouge : le preambule, jamais.
-
-    Elles ne pouvaient pas ne pas bouger — elles nommaient
-    `docs/current/SPEC.md`, qui n'existe plus. Ce qui les entoure est
-    exactement ce que le shell composait.
-    """
-    built = prompts.build("/tech-analyst", BRANCH, prompts.extra_for(
-        "code", NUM, TITLE, milestone=MILESTONE), injector=OLD_INJECTOR)
-    head = oracle("code").split(END)[0] + END
-    assert built.startswith(head)
-    assert built[len(head)] == "\n"
-
-
 def test_the_injector_is_the_only_intentional_difference():
     built = prompts.build("/create-test", BRANCH, injector=prompts.INJECTOR)
     assert prompts.INJECTOR in built
@@ -94,13 +81,8 @@ def test_extra_is_appended_after_the_preamble():
     assert built.endswith(END + "\nEXTRA-TEXT")
 
 
-def test_unknown_stage_has_no_extra():
-    assert prompts.extra_for("does-not-exist", NUM, TITLE) == ""
-
-
-def test_no_stage_is_told_to_archive_anything_any_more():
-    """Le stage a disparu : sa consigne ne doit pas survivre a cote."""
-    assert "archive-instructions" not in definitions.EXTRA
+def test_no_instructions_and_no_scope_produce_no_extra():
+    assert prompts.extra_for("", NUM, TITLE) == ""
 
 
 # --- la portee injectee ----------------------------------------------------
@@ -128,43 +110,10 @@ def test_an_empty_body_is_said_in_words_rather_than_left_blank():
     assert said.count(prompts.EMPTY_BODY) == 2
 
 
-def test_the_scope_follows_the_stages_own_instructions():
-    built = prompts.extra_for("code", NUM, TITLE, milestone=MILESTONE,
-                              scope=scope())
-    assert built.index("Closes #%s" % NUM) < built.index("--- SCOPE")
-
-
 def test_a_stage_with_no_instructions_still_gets_its_scope():
     """`/create-test` n'a pas de consigne : sans ca, il ignorerait sa task."""
-    built = prompts.extra_for("create-test", NUM, TITLE, scope=scope())
+    built = prompts.extra_for("", NUM, TITLE, scope=scope())
     assert built.startswith("--- SCOPE")
     assert TITLE in built
 
 
-def test_the_code_stage_is_told_what_closes_the_issue():
-    """Rien d'autre ne ferme une task, et la boucle s'arrete si rien ne l'a fait."""
-    built = prompts.extra_for("code", NUM, TITLE, milestone=MILESTONE)
-    assert "Closes #4" in built
-    assert "docs/current/SPEC.md" not in built
-
-
-def test_the_analyst_stage_is_told_to_write_into_the_issue_body():
-    built = prompts.extra_for("business-analyst", NUM, TITLE,
-                              milestone=MILESTONE)
-    assert "body of issue #4" in built
-    assert "pipeline:human" in built and "milestone #12" in built
-    assert "docs/current" not in built
-
-
-def test_the_planner_stage_reads_the_roadmap_from_the_issues():
-    built = prompts.extra_for("planner", milestone=MILESTONE)
-    assert "pipeline:roadmap" in built
-    assert "docs/ROADMAP.md" not in built
-    assert "pipeline:ready" in built, "le robinet reste a l'humain"
-
-
-def test_no_stage_instruction_still_points_at_a_deleted_file():
-    """Un prompt qui nomme un fichier absent envoie la session le chercher."""
-    for stage, text in definitions.EXTRA.items():
-        assert "docs/current" not in text, stage
-        assert "docs/ROADMAP.md" not in text, stage

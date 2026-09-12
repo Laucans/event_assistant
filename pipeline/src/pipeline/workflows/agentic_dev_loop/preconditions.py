@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.domain import tasks
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.domain.outcomes.result import Result
 from pipeline.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.agentic_dev_loop.internals import board

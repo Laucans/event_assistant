@@ -14,7 +14,7 @@ import pytest
 from fake_github import FakeGitHub
 
 from pipeline.adapters.shell import github
-from pipeline.domain import tasks
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.domain.outcomes.result import Status
 
 
@@ -42,12 +42,18 @@ def test_a_repository_gh_cannot_name_stops_rather_than_guessing(fake, hub):
 
 
 def test_an_issue_comes_back_in_the_shape_the_domain_reads(fake, hub):
+    """Les champs, et les etiquettes telles quelles.
+
+    Ce que l'adaptateur ne fait pas, et c'est le point : il ne dit pas si
+    l'issue est « prete » ni « d'agent ». Ces mots-la appartiennent au round,
+    qui les lit sur les etiquettes — voir
+    `workflows/agentic_dev_loop/test_tasks.py`.
+    """
     n = fake.add("Schema", tasks.AGENT, tasks.READY, body="le SPEC")
     got = hub.issue(n).value
     assert (got.number, got.title, got.state, got.body) == (
         n, "Schema", "open", "le SPEC")
     assert got.labels == (tasks.AGENT, tasks.READY)
-    assert got.ready and got.agent
 
 
 def test_listing_by_label_leaves_the_pull_requests_out(fake, hub):
@@ -88,10 +94,10 @@ def test_with_blockers_carries_the_state_of_each_blocker(fake, hub):
     b = fake.add("B", tasks.AGENT, tasks.READY)
     fake.block(b, a)
     held = hub.with_blockers([hub.issue(b).value]).value[0]
-    assert not held.runnable
+    assert [(x.number, x.state) for x in held.blocked_by] == [(a, "open")]
     fake.close(a)
     freed = hub.with_blockers([hub.issue(b).value]).value[0]
-    assert freed.runnable and freed.blocked_by[0].closed
+    assert freed.blocked_by[0].closed
 
 
 def test_the_labels_of_the_repository_are_read_by_name(hub):
@@ -170,42 +176,42 @@ def test_reading_an_issue_that_does_not_exist_is_a_read_failure(hub):
     assert got.status is Status.UNREADABLE and "issue #404" in got.reason
 
 
-# --- la PR qui a ferme la task -------------------------------------------
+# --- les PR mergees ------------------------------------------------------
+#
+# L'adaptateur les rend, il ne les juge pas : quelle PR *vaut preuve de
+# livraison* est la convention donnee a /code, et se teste dans
+# `workflows/agentic_dev_loop/test_tasks.py::first_closing`.
 
-def test_the_merged_pr_that_declares_closing_the_issue_is_found(fake, hub):
+def test_a_merged_pr_comes_back_with_its_body(fake, hub):
+    """Le corps est ce que l'appelant lira : sans lui, rien a filtrer."""
     n = fake.add("Brancher le client", tasks.AGENT)
     fake.add_pr("feat(db): le client", body=f"Closes #{n}", base="main_agent",
                 merged=True)
-    got = hub.merged_pr_closing(n, "main_agent")
-    assert got.ok and got.value.title == "feat(db): le client"
+    got = hub.merged_prs("main_agent")
+    assert got.ok
+    assert [(p.title, p.body) for p in got.value] == [
+        ("feat(db): le client", f"Closes #{n}")]
 
 
-def test_a_pr_that_is_closed_but_never_merged_does_not_count(fake, hub):
-    """Une PR refermee sans merge n'a rien livre."""
+def test_a_pr_that_is_closed_but_never_merged_is_left_out(fake, hub):
+    """Une PR refermee sans merge n'a rien livre. `merged_at` est une
+    propriete de l'API : la lire est bien le travail de l'adaptateur."""
     n = fake.add("Brancher le client", tasks.AGENT)
     fake.add_pr("abandonnee", body=f"Closes #{n}", base="main_agent",
                 merged=False)
-    assert hub.merged_pr_closing(n, "main_agent").value is None
-
-
-def test_a_merged_pr_naming_another_issue_does_not_count(fake, hub):
-    n = fake.add("Brancher le client", tasks.AGENT)
-    fake.add_pr("autre chose", body="Closes #999", base="main_agent",
-                merged=True)
-    assert hub.merged_pr_closing(n, "main_agent").value is None
+    assert hub.merged_prs("main_agent").value == []
 
 
 def test_the_base_branch_is_the_one_asked_for(fake, hub):
     n = fake.add("Brancher le client", tasks.AGENT)
     fake.add_pr("ailleurs", body=f"Closes #{n}", base="main", merged=True)
-    assert hub.merged_pr_closing(n, "main_agent").value is None
-    assert hub.merged_pr_closing(n, "main").value is not None
+    assert hub.merged_prs("main_agent").value == []
+    assert [p.title for p in hub.merged_prs("main").value] == ["ailleurs"]
 
 
-def test_an_unreadable_pr_list_fails_rather_than_reading_as_none(fake, hub):
+def test_an_unreadable_pr_list_fails_rather_than_reading_as_empty(fake, hub):
     """Sans ca, une panne d'API se lirait « rien n'a ete livre »."""
-    n = fake.add("Brancher le client", tasks.AGENT)
     fake.fails_on = "pulls"
-    got = hub.merged_pr_closing(n, "main_agent")
+    got = hub.merged_prs("main_agent")
     assert got.status is Status.UNREADABLE
     assert got.value is None

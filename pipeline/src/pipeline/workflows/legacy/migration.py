@@ -21,7 +21,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from pipeline.domain.tasks import AGENT, HUMAN, MILESTONE, ROADMAP
+from pipeline.workflows.agentic_dev_loop.internals.tasks import (
+    AGENT, HUMAN, MILESTONE, ROADMAP)
 
 # Les sections du milestone qui deviennent le corps de l'issue, dans cet
 # ordre. Le reste n'y va pas : « Files & interfaces », « Edge cases » et

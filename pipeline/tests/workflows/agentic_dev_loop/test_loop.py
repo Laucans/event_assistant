@@ -115,8 +115,8 @@ def test_a_rollover_that_opened_a_task_lets_the_loop_carry_on(local, hub,
     number, numbers = milestone(hub, ready=(0,), tasks=("Une task",))
     hub.close(numbers[0])
 
-    from pipeline.domain.stages import agentic_dev_loop_stages as table
-    from pipeline.domain import tasks
+    from pipeline.workflows.agentic_dev_loop import stages as table
+    from pipeline.workflows.agentic_dev_loop.internals import tasks
     from pipeline.execution import session
 
     async def planner_opens_one(stage, cfg, **kw):

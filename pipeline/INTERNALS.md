@@ -45,7 +45,8 @@ l'item dont il descend ; une task `pipeline:agent` et une action humaine
        └─ [pipeline:agent]     corps = le SPEC, écrit par /business-analyst
 ```
 
-Quatre règles, et `domain/tasks.py` les porte seul :
+Quatre règles, et `workflows/agentic_dev_loop/internals/tasks.py`
+les porte seul :
 
 1. le **milestone en cours** est le `pipeline:milestone` ouvert de plus petit
    numéro ;
@@ -107,45 +108,44 @@ workflows/  un sous-paquet par workflow, tous de la même forme
 execution/  faire tourner un stage, sans rien savoir du workflow
 adapters/   tout composant externe, emballé derrière une interface à nous
 runtime/    chemins, journal, mesures — une feuille, comme domain/
-domain/     le métier pur : la table, les textes, les règles, les arrêts
+domain/     le vocabulaire pur : ce qu'est un stage, une issue, un arrêt
 ```
 
-`domain/` et `runtime/` sont rangés en sous-paquets — `domain/stages/`,
-`domain/prompts/`, `domain/outcomes/`, `domain/pr_review/`,
-`domain/legacy/` ; `runtime/monitoring/`, `runtime/filesystem/`. Les
+`domain/` et `runtime/` sont rangés en sous-paquets — `domain/prompts/`,
+`domain/outcomes/` ; `runtime/monitoring/`, `runtime/filesystem/`. Les
 `__init__.py` de ces sous-paquets ne ré-exportent rien : un appelant écrit
 le chemin complet (`from pipeline.domain.outcomes.result import Result`).
-L'exception est `domain/prompts/definitions/__init__.py`, qui *est* le
-registre.
 
-### `domain/` — ce que la boucle *est*
+### `domain/` — le **vocabulaire**, pas la définition
 
 Aucun I/O, aucun subprocess, aucune bibliothèque externe. C'est ce qui rend
 ces décisions testables en leur passant des chaînes de caractères.
 
+Et **aucune mention d'un workflow**, jusque dans les commentaires : le
+domaine dit ce qu'un stage, une issue et un résultat *sont* ; quels stages
+tournent, sous quelles étiquettes et avec quel texte est la définition d'un
+workflow, et vit sous `workflows/<nom>/`.
+`test_no_module_of_the_domain_names_a_workflow` lit le texte des modules et
+l'assère — un module du domaine peut très bien citer un workflow sans
+l'importer, et il n'aurait déjà plus rien à y faire.
+
 | Module | Rôle |
 | --- | --- |
-| `tasks.py` | la forme d'une issue, et les quatre règles qui choisissent la task |
-| `stages/stage_spec.py` | `StageSpec` et les niveaux d'effort — générique, tout workflow s'en sert |
-| `stages/agentic_dev_loop_stages.py` | la table de CE workflow, typée — **la surface de design** |
+| `issues.py` | la forme d'une issue : numéro, titre, état, étiquettes, corps, bloqueurs |
+| `stage_spec.py` | `StageSpec`, les niveaux d'effort, et `spec_of`/`names` — la lecture d'une table quelconque |
 | `prompts/prompt_builder.py` | le préambule, la portée et la composition, repris au bit près du shell |
-| `prompts/definitions/__init__.py` | **le registre** : le dict `{stage: consignes}`, et `NO_INSTRUCTIONS` |
-| `prompts/definitions/agentic_dev_loop/*.py` | un module par stage, une constante chaîne par module |
-| `prompts/definitions/pr_review/brief.py` | `BRIEF_PROMPT`, le prompt de la passe « brief » |
-| `pr_review/notes.py` | ce que la revue publie : marqueur, pied de page, commentaire |
 | `outcomes/stage_result.py` | ce qu'un stage rend, et les marqueurs `AGENT_LOOP_OK` / `AGENT_LOOP_STOP` |
 | `outcomes/result.py` | `Result[T]` : une valeur, ou la raison de son absence — et ce que chaque statut vaut dehors |
 | `outcomes/exit_codes.py` | les codes de sortie qu'un ordonnanceur extérieur lit |
-| `legacy/migration.py` | le markdown traduit en plan d'issues — écrit pour être supprimé |
 
-Les consignes d'un stage sont **des modules Python, pas des `.md`** : le
-domaine ne lit pas le disque, et une constante triple-quote se relit aussi
-bien qu'un fichier de prose. Le registre est **explicite** — un import nommé
-par module de définition — parce qu'une découverte par nom de fichier
-rendrait un stage muet sur une faute de frappe. Un stage qui n'a
-légitimement aucune consigne est nommé dans `NO_INSTRUCTIONS` (`create-test`
-aujourd'hui), et un test exige que toute entrée de `PIPELINE` soit dans l'un
-ou dans l'autre.
+Les consignes d'un stage sont **des modules Python, pas des `.md`** : rien
+ici ne lit le disque, et une constante triple-quote se relit aussi bien
+qu'un fichier de prose. Elles voyagent dans `StageSpec.instructions`, donc
+**dans l'entrée de table**, et non dans un registre indexé par nom de stage.
+Ce registre a existé ; il était une seconde liste à tenir d'accord avec la
+première, et un stage renommé d'un côté perdait son texte de l'autre, en
+silence. Un stage sans consigne a simplement la chaîne vide — c'est le cas
+de `create-test`, qui travaille contre un spec déjà écrit.
 
 ### `adapters/` — l'extérieur, emballé
 
@@ -312,7 +312,7 @@ Refus, code 1, sur stderr :
 | --- | --- |
 | `--stages`/`STAGES` nomme une entrée absente de la table | `RunConfig.enabled` rendait `False` en silence, le round tournait à vide |
 | `--rounds`/`MAX_ROUNDS` ≤ 0 | `range(1, 1)` est vide : le run ne faisait rien, sans le dire |
-| `--effort`/`EFFORT` hors de `domain.stages.stage_spec.EFFORTS` | `StageSpec.__post_init__` explosait au milieu du round, après le préflight |
+| `--effort`/`EFFORT` hors de `domain.stage_spec.EFFORTS` | `StageSpec.__post_init__` explosait au milieu du round, après le préflight |
 | `--verbose` et `--quiet` ensemble | `verbose` gagnait en silence |
 | `--level`/`PR_REVIEW_LEVEL` hors de `low\|medium\|high\|max`, ou un `PR_REVIEW_*_EFFORT` inconnu (revue) | la passe partait avec un niveau que `/code-review` ne connaît pas |
 | `--heartbeat` négatif | une minuterie négative |

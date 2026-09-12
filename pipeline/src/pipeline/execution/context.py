@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from pipeline.adapters.agent import AgentRunner
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
 from pipeline.runtime.filesystem.workspace import Workspace
 from pipeline.runtime.monitoring import metrics
 from pipeline.runtime.monitoring.logbook import Logbook

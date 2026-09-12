@@ -4,7 +4,7 @@ Ce module est de l'orchestration, pas du metier : il compose le prompt,
 choisit les fichiers ou tomberont la trace et l'enveloppe, appelle le moteur
 d'agent, ecrit la ligne de registre, et traduit ce qui est revenu en la bonne
 facon de s'arreter. Le metier qu'il assemble vit ailleurs — la table dans
-`domain.stages`, le texte dans `domain.prompts`, la forme du resultat et les
+`domain.stage_spec`, le texte dans `domain.prompts`, la forme du resultat et les
 marqueurs dans `domain.outcomes.results`.
 
 Il ne connait aucun fournisseur : il parle a `AgentRunner`, et lequel se
@@ -22,7 +22,7 @@ from pipeline.adapters.store import envelope
 from pipeline.adapters.store import ledger
 from pipeline.domain.outcomes.result import Result
 from pipeline.domain.outcomes.stage_result import StageResult, read_markers
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
 from pipeline.execution.context import StagePolicy
 from pipeline.runtime.monitoring import metrics
 from pipeline.runtime.monitoring.logbook import Logbook

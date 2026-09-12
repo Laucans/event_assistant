@@ -7,7 +7,7 @@ et revoir celle des tests reverrait deux fois le meme changement. Les branches
 
 from __future__ import annotations
 
-from pipeline.domain.pr_review import notes as review_notes
+from pipeline.workflows.pr_review.internals import notes as review_notes
 from pipeline.workflows.pr_review.settings import ReviewConfig
 
 # Les metadonnees dont les regles de saut ont besoin, en un appel.

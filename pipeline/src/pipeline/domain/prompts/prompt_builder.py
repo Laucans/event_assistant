@@ -1,15 +1,24 @@
-"""The prompts sent to the stages — the loop's verbal contract.
+"""L'assemblage d'un prompt de stage — la mecanique, pas le texte.
 
-The preamble and the per-stage instructions were taken character for
-character from the old `scripts/agent-loop.sh`: that is what makes it
-provable, by diff, that the migration changed nothing about what the stages
-receive. The only intended difference is the name of the injector.
+Le preambule et les blocs de portee ont ete repris caractere pour caractere
+de l'ancien `scripts/agent-loop.sh` : c'est ce qui rend demontrable, par
+diff, que la migration n'a rien change a ce que les stages recoivent. La
+seule difference voulue est le nom de l'injecteur.
+
+**Ce module ne connait aucun workflow.** La prose propre a un stage voyage
+dans `StageSpec.instructions` et lui est passee en argument ; le registre
+`definitions` qui vivait ici indexait des noms de stages d'un workflow
+precis, ce qui faisait du vocabulaire qui nomme une instance. Il vit
+maintenant dans `workflows/<nom>/stages/`.
 """
 
-from pipeline.domain.prompts import definitions
-
-# The name quoted in the preamble. Former value: "scripts/agent-loop.sh".
-INJECTOR = "pipeline/launcher/cli/agentic_dev_loop.py"
+# Le nom cite dans le preambule quand l'appelant n'en donne pas d'autre.
+# Ancienne valeur : "scripts/agent-loop.sh", qui nommait le script. Un
+# workflow passe le sien, declare a cote de sa table ; ce defaut est
+# volontairement generique, parce que nommer ici la CLI d'un workflow precis
+# serait exactement l'instance-dans-le-vocabulaire que cette couche n'a pas
+# le droit de porter.
+INJECTOR = "the pipeline runner"
 
 _PREAMBLE = """
 --- EXECUTION CONTEXT (injected by scripts/agent-loop.sh) ---
@@ -107,18 +116,20 @@ def scope(*, milestone: str = "", milestone_title: str = "",
                 num=num, title=title, body=(body.strip() or EMPTY_BODY))
 
 
-def extra_for(stage: str, num: str = "", title: str = "", *,
+def extra_for(instructions: str, num: str = "", title: str = "", *,
               milestone: str = "", scope: str = "") -> str:
-    """A stage's `extra`: its own instructions, then the scope it works in.
+    """L'`extra` d'un stage : ses consignes, puis la portee ou il travaille.
 
-    The scope comes last because it is the long part — the instructions stay
-    where a reader (and a model) finds them, at the top. A stage with no
-    entry in EXTRA still gets its scope: `create-test` has no instructions of
-    its own, and would otherwise be the one paid session in the round that
-    does not know which task it is testing.
+    La portee vient en dernier parce que c'est la partie longue — les
+    consignes restent la ou un lecteur (et un modele) les trouve, en haut. Un
+    stage sans consignes recoit quand meme sa portee : /create-test n'en a
+    pas, et serait sinon la seule session payee du round qui ignore quelle
+    task elle teste.
+
+    Les consignes arrivent en argument, pas par un nom de stage : ce module
+    ne connait aucune table et n'a donc rien a chercher.
     """
-    body = fill(definitions.EXTRA.get(stage, ""), num=num, title=title,
-                milestone=milestone)
+    body = fill(instructions, num=num, title=title, milestone=milestone)
     if not scope:
         return body
     return f"{body}\n\n{scope}" if body else scope

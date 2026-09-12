@@ -1,12 +1,12 @@
 """`RunConfig` : les filtres et les surcharges, appliques a la table.
 
-Separe de `domain/stages/test_stages.py` comme les deux modules le sont : la
+Separe de `test_stages.py` comme les deux modules le sont : la
 table est un design, la config est un etat de run lu dans l'environnement.
 """
 
 import pytest
 
-from pipeline.domain.stages.agentic_dev_loop_stages import PIPELINE
+from pipeline.workflows.agentic_dev_loop.stages import PIPELINE
 from pipeline.workflows.agentic_dev_loop.settings import (
     ConfigError, RunConfig)
 

@@ -1,8 +1,8 @@
 """Ce qui varie d'un run a l'autre : les flags, et leurs defauts d'environnement.
 
-Separe de `domain.stages` a dessein : la table du pipeline est un design qu'on
-relit, `RunConfig` est un etat de run qu'on lit dans `os.environ`. Melanger les
-deux faisait qu'on ne pouvait pas toucher a l'un sans relire l'autre.
+Separe de `stages/` a dessein : la table du round est un design qu'on relit,
+`RunConfig` est un etat de run qu'on lit dans `os.environ`. Melanger les deux
+faisait qu'on ne pouvait pas toucher a l'un sans relire l'autre.
 
 **Ici et pas dans `runtime/`**, meme si les valeurs viennent de
 l'environnement : `enabled`, `resolve`, `filtered_out` et `summary` parcourent
@@ -23,11 +23,12 @@ l'assere (`test_every_environment_variable_the_code_reads_is_in_a_help_epilog`).
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from pipeline.domain.prompts import prompt_builder as prompts
-from pipeline.domain.stages.agentic_dev_loop_stages import PIPELINE, ROLLOVER
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
+from pipeline.workflows.agentic_dev_loop.stages import (
+    INJECTOR, PIPELINE, ROLLOVER)
 from pipeline.workflows.common.contract.settings import WorkflowConfig
 
 
@@ -104,19 +105,21 @@ class RunConfig(WorkflowConfig):
         return stage.skill in self.stages.split()
 
     def resolve(self, stage: StageSpec) -> StageSpec:
-        """MODEL/EFFORT are the blunt override: one value for the whole run."""
+        """MODEL/EFFORT are the blunt override: one value for the whole run.
+
+        `replace` plutot qu'une reconstruction champ par champ : un champ
+        ajoute a `StageSpec` — les consignes en sont un — serait sinon perdu
+        des qu'un run donne `--model`, et le stage partirait sans son texte.
+        """
         if not self.model and not self.effort:
             return stage
-        return StageSpec(
-            stage.skill,
-            self.model or stage.model,
-            self.effort or stage.effort,
-            stage.lead,
-        )
+        return replace(stage, model=self.model or stage.model,
+                       effort=self.effort or stage.effort)
 
     def prompt_for(self, stage: StageSpec, extra: str) -> str:
         """Le texte d'une session de ce stage, sur la branche d'integration."""
-        return prompts.build(stage.command, self.integration_branch, extra)
+        return prompts.build(stage.command, self.integration_branch, extra,
+                             injector=INJECTOR)
 
     def summary(self) -> str:
         """`business-analyst(opus/high) -> code(opus/high) -> ...`."""

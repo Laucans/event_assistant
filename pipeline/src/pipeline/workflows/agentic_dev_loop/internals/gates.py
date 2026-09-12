@@ -14,11 +14,10 @@ qui garantit qu'un stage suivant n'est pas paye apres.
 from __future__ import annotations
 
 from pipeline.adapters.shell.github import GitHub
-from pipeline.domain import tasks
 from pipeline.domain.outcomes.result import Result
-from pipeline.domain.stages.stage_spec import StageSpec
+from pipeline.domain.stage_spec import StageSpec
 from pipeline.runtime.monitoring.logbook import Logbook
-from pipeline.workflows.agentic_dev_loop.internals import board
+from pipeline.workflows.agentic_dev_loop.internals import board, tasks
 from pipeline.workflows.agentic_dev_loop.internals.state import RoundState
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 
@@ -95,12 +94,12 @@ def already_delivered(gh: GitHub, num: int, branch: str) -> Result[bool]:
     here = gh.issue(num)
     if here.failed:
         return here.recast()
-    if here.value.closed or here.value.waiting_merge:
+    if here.value.closed or tasks.waiting_merge(here.value):
         return Result.of(True)
-    shipped = gh.merged_pr_closing(num, branch)
-    if shipped.failed:
-        return shipped.recast()
-    return Result.of(shipped.value is not None)
+    merged = gh.merged_prs(branch)
+    if merged.failed:
+        return merged.recast()
+    return Result.of(tasks.first_closing(merged.value, num) is not None)
 
 
 def task_is_delivered(cfg: RunConfig, gh: GitHub, log: Logbook,
@@ -131,13 +130,14 @@ def task_is_delivered(cfg: RunConfig, gh: GitHub, log: Logbook,
     here = gh.issue(num)
     if here.failed:
         return here.recast()
-    if here.value.closed or here.value.waiting_merge:
+    if here.value.closed or tasks.waiting_merge(here.value):
         return Result.of(None)
-    shipped = gh.merged_pr_closing(num, cfg.integration_branch)
-    if shipped.failed:
-        return shipped.recast()
-    if shipped.value is not None:
-        log(f"#{num} livree par la PR #{shipped.value.number}, mergee"
+    merged = gh.merged_prs(cfg.integration_branch)
+    if merged.failed:
+        return merged.recast()
+    shipped = tasks.first_closing(merged.value, num)
+    if shipped is not None:
+        log(f"#{num} livree par la PR #{shipped.number}, mergee"
             f" sur {cfg.integration_branch} — marquee"
             f" {tasks.WAITING_MERGE}, a vous de la fermer en"
             f" fusionnant dans la branche par defaut")

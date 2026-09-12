@@ -1,4 +1,4 @@
-"""Les quatre regles de choix, exercees sur des `Task` construites a la main.
+"""Les quatre regles de choix, exercees sur des `Issue` construites a la main.
 
 Elles decidaient autrefois d'un markdown, et se testaient en lui passant un
 milestone en chaine de caracteres. Elles decident maintenant d'un graphe
@@ -12,13 +12,13 @@ l'entree qui declenche un `/planner` a plusieurs dollars.
 
 import pytest
 
-from pipeline.domain import tasks
-from pipeline.domain.tasks import Task
+from pipeline.domain.issues import Issue
+from pipeline.workflows.agentic_dev_loop.internals import tasks
 
 
 def task(number, *labels, state="open", blocked_by=(), title="Une task"):
-    return Task(number=number, title=title, state=state, labels=tuple(labels),
-                blocked_by=tuple(blocked_by))
+    return Issue(number=number, title=title, state=state,
+                 labels=tuple(labels), blocked_by=tuple(blocked_by))
 
 
 def test_the_current_milestone_is_the_lowest_open_one():
@@ -69,8 +69,8 @@ def test_a_human_issue_blocks_exactly_like_any_other_dependency():
     human = task(9, tasks.HUMAN, title="Creer le projet Vercel")
     held = task(10, tasks.AGENT, tasks.READY, blocked_by=[human])
     assert tasks.next_task([held]) is None
-    assert "human action" in held.why_not()
-    assert "#9" in held.why_not()
+    assert "human action" in tasks.why_not(held)
+    assert "#9" in tasks.why_not(held)
 
 
 def test_a_dependency_graph_is_not_a_chain_of_numbers():
@@ -127,13 +127,13 @@ def test_the_task_key_is_the_issue_number():
 @pytest.mark.parametrize("labels, kind", [
     ((tasks.AGENT,), "auto"), ((tasks.HUMAN,), "human")])
 def test_the_kind_is_read_from_the_label(labels, kind):
-    assert task(1, *labels).kind == kind
+    assert tasks.kind(task(1, *labels)) == kind
 
 
 def test_the_spec_written_label_is_what_says_the_spec_exists():
     """Ce que `docs/current/SPEC.md` disait par sa presence."""
-    assert not task(1, tasks.AGENT).spec_written
-    assert task(1, tasks.AGENT, tasks.SPEC_WRITTEN).spec_written
+    assert not tasks.spec_written(task(1, tasks.AGENT))
+    assert tasks.spec_written(task(1, tasks.AGENT, tasks.SPEC_WRITTEN))
 
 
 def test_every_label_the_model_uses_is_declared_once():
@@ -212,8 +212,34 @@ def test_a_human_blocker_is_unaffected_by_the_new_label():
 def test_why_not_names_the_merge_rather_than_a_missing_label():
     """Le geste qui debloque n'est pas le meme : ici c'est une fusion."""
     waiting = task(10, tasks.AGENT, tasks.READY, tasks.WAITING_MERGE)
-    assert "waiting" in waiting.why_not() and "merge" in waiting.why_not()
+    said = tasks.why_not(waiting)
+    assert "waiting" in said and "merge" in said
 
 
 def test_the_label_is_part_of_the_set_preflight_checks():
     assert tasks.WAITING_MERGE in tasks.LABELS
+
+
+# --- laquelle des PR mergees vaut preuve de livraison ----------------------
+#
+# La regle a quitte `adapters.shell.github`, qui l'appliquait en listant les
+# PR. L'adaptateur rend maintenant les PR mergees sur une base et rien de
+# plus ; ce qui suit est la moitie qui decide, et elle se teste sans reseau.
+
+def pr(number, body, title="une PR"):
+    return Issue(number=number, title=title, body=body)
+
+
+def test_the_first_merged_pr_that_closes_the_issue_is_the_proof():
+    prs = [pr(3, "rien a voir"), pr(2, "Closes #12"), pr(1, "Closes #12")]
+    assert tasks.first_closing(prs, 12).number == 2
+
+
+def test_a_merged_pr_naming_another_issue_is_not_the_proof():
+    assert tasks.first_closing([pr(2, "Closes #999")], 12) is None
+
+
+def test_no_merged_pr_at_all_is_not_a_failure_it_is_an_absence():
+    """« rien n'a ete livre » est une reponse, pas une panne : c'est
+    l'adaptateur qui distingue l'API muette de l'API cassee."""
+    assert tasks.first_closing([], 12) is None
