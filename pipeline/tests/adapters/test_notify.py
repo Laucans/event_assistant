@@ -3,6 +3,10 @@
 Rien ici n'appelle `osascript` — `subprocess` est remplace. Ce qui est teste,
 c'est qu'elle se tait hors macOS, qu'elle nomme la boucle, et qu'un message ne
 peut pas sortir de sa propre citation dans l'AppleScript.
+
+`notify` a deux gardes : la plateforme, puis `shutil.which("osascript")`. Un
+test qui veut atteindre l'appel doit donc remplacer les deux — sinon il passe
+sur le Mac qui a `osascript` et se tait sur le Linux de la CI.
 """
 
 import sys
@@ -22,6 +26,7 @@ def test_the_notification_names_the_loop(monkeypatch):
     seen = []
     monkeypatch.setattr(notify_mod.subprocess, "run", lambda *a, **kw: seen.append(a[0]))
     monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(notify_mod.shutil, "which", lambda name: "/usr/bin/" + name)
     notify_mod.notify("loop finished: 1 task(s) DONE")
     assert seen and seen[0][0] == "osascript"
     assert 'with title "agent-loop"' in seen[0][2]
@@ -33,6 +38,7 @@ def test_a_notification_cannot_break_out_of_its_own_quoting(monkeypatch):
     seen = []
     monkeypatch.setattr(notify_mod.subprocess, "run", lambda *a, **kw: seen.append(a[0]))
     monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(notify_mod.shutil, "which", lambda name: "/usr/bin/" + name)
     notify_mod.notify('un "titre" cite ' + "x" * 400)
     script = seen[0][2]
     assert script.count('"') == 4          # les deux paires du script lui-meme

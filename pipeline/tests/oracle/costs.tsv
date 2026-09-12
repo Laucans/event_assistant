@@ -1,0 +1,5 @@
+when	run	round	task	stage	cost_usd	turns	duration_ms	in	out	session	ran_on
+2026-09-09T17:55:32	20260909-175312	01	3|Supabase account & connection	code	0.981425	23	137201	24	9797	f1fd82f9-4ca8-4a72-92c3-ed94a1f27bd6	opus/high
+2026-09-09T17:59:03	20260909-175312	01	3|Supabase account & connection	create-test	0.646022	35	209944	54	10675	f3d03074-cbd4-4b35-9493-a5ebd0a1dbb0	sonnet/high
+2026-09-09T18:00:13	20260909-175312	01	3|Supabase account & connection	archive-instructions	0.153687	18	69621	122	4840	b37a9b2a-39d5-4a44-a485-4604de12ba75	haiku/low
+2026-09-09T18:16:34	20260909-180832	01	4|Schema, seed & first DB-backed page	analyst	1.854552	18	479591	22	35501	380b91af-3111-4567-a61c-39f472fb360e	opus/high
