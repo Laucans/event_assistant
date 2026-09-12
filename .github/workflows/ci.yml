@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, main_agent]
   pull_request:
-    # main_agent is the integration branch scripts/agent-loop.sh merges into;
+    # main_agent is the integration branch scripts/agent-loop merges into;
     # without it here those PRs get no check and `gh pr checks` never resolves.
     branches: [main, main_agent]
 
@@ -30,3 +30,19 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+
+      # The agent loop and the PR review live in pipeline/ (Python). They are
+      # what merges these very PRs and what enforces "never push to main", so
+      # a regression there is not caught by anything else — and `npm test`
+      # never touches them. Same job as the Node checks on purpose: `ci` is
+      # the single check CLAUDE.md names as the merge gate.
+      #
+      # 3.13, not 3.14: crewai caps at python < 3.14 (pipeline/pyproject.toml).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pipeline/pyproject.toml
+
+      - run: pip install -e 'pipeline[dev]'
+      - run: python -m pytest pipeline/tests

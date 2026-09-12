@@ -12,3 +12,6 @@ next-env.d.ts
 
 # Claude Code tooling config — edited via the vibe-specialist subagent.
 .claude/
+
+# Le venv du pipeline : du code de dependances, gitignore, pas le notre.
+pipeline/.venv/
