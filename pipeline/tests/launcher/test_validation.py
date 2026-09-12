@@ -4,7 +4,7 @@ import argparse
 
 import pytest
 
-from pipeline.domain import stage_spec
+from pipeline.core.domain import stage_spec
 from pipeline.launcher import routes, validation
 from pipeline.launcher.cli import agentic_dev_loop as loop_cli
 from pipeline.launcher.cli import pr_review as review_cli

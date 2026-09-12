@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from pipeline.domain.outcomes.result import Result, Status
+from pipeline.core.domain.outcomes.result import Result, Status
 
 
 class RoundState(BaseModel):

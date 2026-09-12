@@ -14,9 +14,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from pipeline.adapters.agent import AgentRunner
-from pipeline.adapters.shell.github import GitHub
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.adapters.agent import AgentRunner
+from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.common.contract import workflow as contract
 from pipeline.workflows.common.contract.outcome import WorkflowOutcome
 from pipeline.workflows.pr_review.internals import review

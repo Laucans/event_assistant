@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING, Callable
 
-from pipeline.domain import stage_spec
+from pipeline.core.domain import stage_spec
 
 if TYPE_CHECKING:
     from pipeline.launcher.routes import Route

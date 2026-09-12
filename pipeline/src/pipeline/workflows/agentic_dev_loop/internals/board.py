@@ -22,9 +22,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from pipeline.adapters.shell.github import GitHub
-from pipeline.domain.issues import Issue
-from pipeline.domain.outcomes.result import Result
+from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.domain.issues import Issue
+from pipeline.core.domain.outcomes.result import Result
 from pipeline.workflows.agentic_dev_loop.internals import tasks
 
 

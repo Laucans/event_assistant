@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import subprocess
 
-from pipeline.adapters.shell.git import Git
-from pipeline.adapters.shell.github import GitHub
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.adapters.shell.git import Git
+from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.runtime.filesystem.workspace import Workspace
 
 # Les deux classes, nommees ici pour qu'un test n'ait qu'un endroit a
 # remplacer. `conftest` s'en sert.

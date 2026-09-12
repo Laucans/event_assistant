@@ -16,6 +16,9 @@ Quatre regles paient leur place, et chacune a coute quelque chose :
   lui passant des chaines — et **il ne nomme aucun workflow** : il porte le
   vocabulaire (ce qu'est un stage, une issue, un resultat), jamais la
   definition d'un workflow, qui vit sous `workflows/<nom>/` ;
+- **rien sous `core/` ne connait `workflows/` ni `launcher/`.** C'est la
+  frontiere framework/usage, et elle tient en une assertion la ou il fallait
+  sinon la lire dans quatre lignes de la table `ALLOWED` ;
 - **tout workflow a la meme forme.** Les memes modules a sa racine, les memes
   classes dedans, et son code propre dans `internals/`. Un README qui le dit
   est vrai le jour ou il est ecrit ; le test plus bas le garde vrai.
@@ -32,21 +35,30 @@ import pytest
 
 SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "pipeline"
 
-# Qui a le droit d'importer quoi. La cle est un prefixe de chemin dans le
-# paquet, la valeur les prefixes de `pipeline.*` qu'il peut importer.
+# Le dossier du framework. Ses sous-paquets sont des couches a part entiere,
+# d'ou les cles a deux segments plus bas : sans ca, `core` serait une seule
+# couche et `domain` pourrait importer `execution` sans que rien ne bronche.
+CORE = "core"
+
+# Qui a le droit d'importer quoi. La cle est une couche — un dossier du
+# sommet, ou un sous-dossier de `core/` —, la valeur les couches qu'elle peut
+# importer.
 ALLOWED: dict[str, set[str]] = {
-    "domain": {"domain"},
+    "core/domain": {"core/domain"},
     # `runtime` est une feuille, au meme titre que `domain` : chemins, journal
     # et mesures ne decident de rien et n'ont besoin de personne. `RunConfig`
     # y a vecu un temps et etait le seul a importer le domaine — ses methodes
     # parcourent PIPELINE, donc c'etait une politique deguisee en reglage. Elle
     # est dans `workflows/agentic_dev_loop/settings.py`.
-    "runtime": {"runtime"},
-    "adapters": {"adapters", "domain", "runtime"},
-    "execution": {"adapters", "domain", "runtime", "execution"},  # pas workflows
-    "workflows": {"adapters", "domain", "execution", "runtime", "workflows"},
-    "launcher": {"adapters", "domain", "execution", "launcher", "runtime",
-                 "workflows"},
+    "core/runtime": {"core/runtime"},
+    "core/adapters": {"core/adapters", "core/domain", "core/runtime"},
+    # pas workflows : c'est ce que le `Protocol` StagePolicy existe pour eviter
+    "core/execution": {"core/adapters", "core/domain", "core/runtime",
+                       "core/execution"},
+    "workflows": {"core/adapters", "core/domain", "core/execution",
+                  "core/runtime", "workflows"},
+    "launcher": {"core/adapters", "core/domain", "core/execution",
+                 "core/runtime", "launcher", "workflows"},
 }
 
 # Ce qui doit rester chargeable par le python du systeme, hors du venv : les
@@ -56,9 +68,9 @@ STDLIB_ONLY_DIR = "launcher/hooks/"
 
 # Les bibliotheques qui n'ont le droit d'apparaitre qu'a un seul endroit.
 CONFINED = {
-    "claude_agent_sdk": "adapters/agent/claude_sdk.py",
-    "crewai": "adapters/engine/crewai_engine.py",
-    "crewai_core": "adapters/engine/crewai_engine.py",
+    "claude_agent_sdk": "core/adapters/agent/claude_sdk.py",
+    "crewai": "core/adapters/engine/crewai_engine.py",
+    "crewai_core": "core/adapters/engine/crewai_engine.py",
 }
 
 
@@ -83,7 +95,24 @@ def imports(path: pathlib.Path) -> list[str]:
 
 
 def layer(path: pathlib.Path) -> str:
-    return path.relative_to(SRC).parts[0].removesuffix(".py")
+    """La couche d'un fichier : `core/domain`, `workflows`, `launcher`…
+
+    Les sous-paquets de `core/` sont des couches ; `core/__init__.py` n'en
+    est pas une, et rend `core` — une cle absente d'`ALLOWED`, donc ignoree,
+    comme l'`__init__.py` de la racine.
+    """
+    parts = path.relative_to(SRC).parts
+    if parts[0] == CORE and len(parts) > 1 and not parts[1].endswith(".py"):
+        return f"{CORE}/{parts[1]}"
+    return parts[0].removesuffix(".py")
+
+
+def target(module: str) -> str:
+    """La couche que nomme un import `pipeline.…`, dans les memes termes."""
+    parts = module.split(".")
+    if len(parts) > 2 and parts[1] == CORE:
+        return f"{CORE}/{parts[2]}"
+    return parts[1]
 
 
 @pytest.mark.parametrize("library, home", sorted(CONFINED.items()))
@@ -107,10 +136,40 @@ def test_every_layer_only_imports_the_layers_below_it():
         for module in imports(path):
             if not module.startswith("pipeline."):
                 continue
-            target = module.split(".")[1]
-            if target not in allowed:
+            if target(module) not in allowed:
                 faults.append(f"{path.relative_to(SRC)} -> {module}")
     assert not faults, "imports qui remontent une couche : %s" % faults
+
+
+def test_every_layer_of_core_is_named_by_the_allowed_table():
+    """Une couche absente de la table est une couche sans aucune regle.
+
+    `ALLOWED.get(here)` rend None pour une cle inconnue, et le test ci-dessus
+    passe alors le fichier sans rien verifier. Ajouter `core/quelque_chose/`
+    sans l'y declarer ferait donc taire la regle au lieu de l'appliquer.
+    """
+    found = {f"{CORE}/{d.name}" for d in (SRC / CORE).iterdir()
+             if d.is_dir() and not d.name.startswith("__")}
+    missing = found - set(ALLOWED)
+    assert not missing, f"couches de core/ hors de la table : {missing}"
+
+
+def test_nothing_under_core_knows_a_workflow_or_the_launcher():
+    """La frontiere framework/usage, en une assertion plutot qu'en quatre.
+
+    C'est la regle qui justifie le dossier `core/` : ce qui est dedans se
+    branche sous n'importe quel workflow, donc un troisieme workflow ne
+    demande de toucher a rien. Dite ici directement, elle se lit d'un coup —
+    et elle mord meme sur un sous-paquet de `core/` qu'on aurait oublie de
+    declarer dans `ALLOWED`.
+    """
+    faults = []
+    for path in modules():
+        if not str(path.relative_to(SRC)).startswith(CORE + "/"):
+            continue
+        faults += [f"{path.relative_to(SRC)} -> {m}" for m in imports(path)
+                   if m.startswith(("pipeline.workflows", "pipeline.launcher"))]
+    assert not faults, "le framework connait son utilisateur : %s" % faults
 
 
 def module_level_imports(path: pathlib.Path) -> list[str]:
@@ -168,7 +227,7 @@ def test_the_stdlib_only_scan_covers_the_router_and_every_hook():
 def test_the_domain_touches_neither_the_disk_nor_a_subprocess():
     """Ce qui rend le metier testable en lui passant des chaines."""
     banned = {"subprocess", "sqlite3", "shutil", "socket", "urllib", "requests"}
-    for path in sorted((SRC / "domain").rglob("*.py")):
+    for path in sorted((SRC / CORE / "domain").rglob("*.py")):
         offenders = sorted(banned & set(imports(path)))
         assert not offenders, f"{path.relative_to(SRC)} importe {offenders}"
 
@@ -191,7 +250,7 @@ def names_paths(path: pathlib.Path) -> list[str]:
     return found
 
 
-HOME_OF_PATHS = "runtime/filesystem/"
+HOME_OF_PATHS = "core/runtime/filesystem/"
 
 
 def test_only_runtime_filesystem_names_the_paths_module():
@@ -204,7 +263,7 @@ def test_only_runtime_filesystem_names_the_paths_module():
         faults += [f"{here} -> {name}" for name in names_paths(path)]
     assert not faults, "le global est revenu : %s" % faults
     # Le garde-fou du garde-fou : un scan qui ne trouve rien passerait partout.
-    assert names_paths(SRC / "runtime/filesystem/workspace.py")
+    assert names_paths(SRC / "core/runtime/filesystem/workspace.py")
 
 
 def test_the_scan_actually_reads_the_package():
@@ -213,8 +272,8 @@ def test_the_scan_actually_reads_the_package():
     assert len(files) > 30, files
     assert any(imports(p) for p in files)
     # et la regle de confinement porte bien sur du code qui existe
-    assert (SRC / "adapters/agent/claude_sdk.py").exists()
-    assert (SRC / "adapters/engine/crewai_engine.py").exists()
+    assert (SRC / "core/adapters/agent/claude_sdk.py").exists()
+    assert (SRC / "core/adapters/engine/crewai_engine.py").exists()
 
 
 # --- la forme d'un workflow ------------------------------------------------
@@ -245,12 +304,6 @@ ROOT_MODULES = ("workflow.py", "settings.py", "preconditions.py",
 # `internals/` : sa mecanique, qui n'a pas a se ressembler d'un workflow a
 # l'autre.
 WORKFLOW_DIRS = {"stages", "internals"}
-
-# Les couches qui n'ont rien a savoir de ce qu'un workflow appelle une task.
-# Le launcher est exclu a dessein : c'est la couche d'usage, et son `--help`
-# parle a un humain de la boucle qu'il lance.
-BELOW_THE_WORKFLOWS = {"domain", "adapters", "execution", "runtime"}
-
 
 def workflow_packages() -> list[pathlib.Path]:
     """Les dossiers de `workflows/` qui sont des workflows."""
@@ -331,7 +384,7 @@ def test_no_module_of_the_domain_names_a_workflow():
     dessus.
     """
     faults = []
-    for path in sorted((SRC / "domain").rglob("*.py")):
+    for path in sorted((SRC / CORE / "domain").rglob("*.py")):
         text = path.read_text(encoding="utf-8")
         faults += [f"{path.relative_to(SRC)} nomme {name!r}"
                    for name in workflow_names() if name in text]
@@ -346,25 +399,31 @@ def test_only_its_own_workflow_names_the_pipeline_labels():
     L'adaptateur, en particulier, n'a jamais a savoir ce qu'une etiquette
     signifie — il lit des issues, il ne decide pas.
 
-    La regle porte sur les couches **sous** `workflows/`. Le launcher est
-    l'autre bord : c'est la couche d'usage, son `--help` explique la boucle a
-    un humain et doit pouvoir nommer `pipeline:ready`. `workflows/legacy`
-    ecrit ces etiquettes — c'est son travail — et les importe du workflow.
+    La regle porte sur `core/` : le framework n'a pas a savoir ce qu'un
+    workflow appelle une task. Le launcher est l'autre bord et en est exclu —
+    c'est la couche d'usage, son `--help` explique la boucle a un humain et
+    doit pouvoir nommer `pipeline:ready`. `workflows/legacy` ecrit ces
+    etiquettes — c'est son travail — et les importe du workflow.
     """
-    home = "workflows/agentic_dev_loop/"
+    scanned = 0
     faults = []
     for path in modules():
         here = str(path.relative_to(SRC))
-        if layer(path) not in BELOW_THE_WORKFLOWS or here.startswith(home):
+        if not here.startswith(CORE + "/"):
             continue
+        scanned += 1
         if "pipeline:" in path.read_text(encoding="utf-8"):
             faults.append(here)
     assert not faults, (
         f"les etiquettes pipeline: sont la definition du round, pas du"
         f" vocabulaire — vues dans : {faults}")
-    # Le garde-fou du garde-fou : un scan qui ne trouve rien passerait partout.
+    # Les deux garde-fous du garde-fou. Le premier a deja servi : le passage a
+    # `core/` a change ce que `layer()` rend, et la regle a cesse de scanner
+    # quoi que ce soit tout en restant verte.
+    assert scanned > 10, f"la regle ne scanne plus rien ({scanned} fichiers)"
     assert "pipeline:" in (
-        SRC / home / "internals/tasks.py").read_text(encoding="utf-8")
+        SRC / "workflows/agentic_dev_loop/internals/tasks.py"
+    ).read_text(encoding="utf-8")
 
 
 def test_a_workflow_never_imports_another_workflow():

@@ -21,10 +21,10 @@ import contextlib
 from collections.abc import Callable
 from pathlib import Path
 
-from pipeline.adapters.agent import AgentRunner
-from pipeline.adapters.shell.github import GitHub
-from pipeline.domain.outcomes.result import Result
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.adapters.agent import AgentRunner
+from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.common.contract.outcome import WorkflowOutcome
 from pipeline.workflows.common.utils import hub as adapters
 from pipeline.workflows.pr_review.internals import passes, publish

@@ -25,8 +25,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field, replace
 
-from pipeline.domain.prompts import prompt_builder as prompts
-from pipeline.domain.stage_spec import StageSpec
+from pipeline.core.domain.prompts import prompt_builder as prompts
+from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.workflows.agentic_dev_loop.stages import (
     INJECTOR, PIPELINE, ROLLOVER)
 from pipeline.workflows.common.contract.settings import WorkflowConfig

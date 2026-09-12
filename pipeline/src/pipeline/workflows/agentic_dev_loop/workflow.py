@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.agentic_dev_loop.postconditions import (
     LoopPostconditions)
 from pipeline.workflows.agentic_dev_loop.preconditions import (

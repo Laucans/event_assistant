@@ -13,10 +13,10 @@ qui garantit qu'un stage suivant n'est pas paye apres.
 
 from __future__ import annotations
 
-from pipeline.adapters.shell.github import GitHub
-from pipeline.domain.outcomes.result import Result
-from pipeline.domain.stage_spec import StageSpec
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.domain.stage_spec import StageSpec
+from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.workflows.agentic_dev_loop.internals import board, tasks
 from pipeline.workflows.agentic_dev_loop.internals.state import RoundState
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig

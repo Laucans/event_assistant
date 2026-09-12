@@ -107,7 +107,7 @@ def hub(monkeypatch):
     for exactly this, and going through the real adapter means these tests
     exercise the API paths it builds, not a mock of them.
     """
-    from pipeline.adapters.shell import github
+    from pipeline.core.adapters.shell import github
     from pipeline.workflows.common.utils import hub as adapters
 
     fake = FakeGitHub()

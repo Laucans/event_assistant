@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.domain.outcomes.result import Result, Status
-from pipeline.runtime.monitoring.logbook import Logbook
+from pipeline.core.domain.outcomes.result import Result, Status
+from pipeline.core.runtime.monitoring.logbook import Logbook
 
 
 @dataclass(frozen=True)

@@ -9,10 +9,10 @@ registre exact dont `oracle/costs-report.txt` est la sortie.
 import pytest
 from conftest import ORACLE, milestone
 
-from pipeline.adapters.store import ledger, resume
+from pipeline.core.adapters.store import ledger, resume
 from pipeline.launcher.cli import reports
 from pipeline.workflows.agentic_dev_loop.internals import tasks
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.runtime.filesystem.workspace import Workspace
 
 
 def test_report_matches_the_shell_output():

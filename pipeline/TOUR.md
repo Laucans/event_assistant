@@ -29,31 +29,51 @@ paraît bizarre, c'est presque toujours l'une des trois.
 
 ## 2. Les couches, et le sens des dépendances
 
+**Trois dossiers au sommet**, et ils disent qui sert qui :
+
 ```
-launcher/    les points d'entrée : flags, JSON stdin, codes de sortie
-   ↓
-workflows/   un dossier par workflow, tous de la même forme
-             (common/ : le contrat, et ce qu'ils réutilisent)
-   ↓
-execution/   la mécanique générique : lancer un stage, le sauter, le compter
-   ↓
-adapters/    l'extérieur, emballé : gh, git, le SDK, crewai, le disque
-   ↓
-domain/ runtime/     deux feuilles : le métier pur, et le support transverse
+launcher/    le déclenchement : flags, JSON stdin, codes de sortie
+workflows/   la définition : un dossier par workflow, tous de la même forme
+core/        le framework : ce qui ne sait rien d'aucun workflow
 ```
 
-Une flèche = « a le droit d'importer ». **Rien ne remonte.** Et ce ne sont
-pas des conventions : `tests/test_layering.py` parcourt l'AST de chaque
-fichier et l'assère, imports tardifs compris. Onze règles y vivent :
+`core/` porte les quatre couches, et la flèche va toujours vers le bas :
+
+```
+   launcher/    ─┐
+   workflows/   ─┴─→ core/
+                      ↓
+   core/execution/    la mécanique générique : lancer un stage, le sauter
+                      ↓
+   core/adapters/     l'extérieur, emballé : gh, git, le SDK, crewai, le disque
+                      ↓
+   core/domain/  core/runtime/    deux feuilles : le vocabulaire, et le support
+```
+
+Une flèche = « a le droit d'importer ». **Rien ne remonte**, et surtout :
+**rien sous `core/` n'importe `workflows/` ni `launcher/`**. C'est la règle
+qui justifie le dossier — dite une fois
+(`test_nothing_under_core_knows_a_workflow_or_the_launcher`) là où il fallait
+sinon la lire dans quatre lignes de la table `ALLOWED`. C'est aussi ce qui
+rend un troisième workflow facile : il se branche sur le framework, le
+framework ne se branche sur rien.
+
+Et ce ne sont pas des conventions : `tests/test_layering.py` parcourt l'AST
+de chaque fichier et l'assère, imports tardifs compris. Quatorze règles y
+vivent :
 
 | Règle | Ce qu'elle empêche |
 | --- | --- |
 | chaque couche n'importe que celles du dessous | le premier pas vers un cycle |
+| rien sous `core/` ne connaît `workflows/` ni `launcher/` | que le framework se branche sur son utilisateur |
+| toute couche de `core/` est nommée dans `ALLOWED` | qu'un sous-paquet oublié échappe à toute règle |
 | `execution` n'importe **aucun** `workflows` | que la mécanique se lie à un workflow |
 | crewai et le SDK dans **un seul** fichier chacun | 1,8 s sur le chemin rapide |
 | le launcher : stdlib seule au niveau module | que tous les hooks du dépôt cassent |
-| `domain/` ne touche ni disque ni subprocess | que le métier cesse d'être testable avec des chaînes |
-| seul `runtime/filesystem/` nomme `paths` | que le global de chemins repousse |
+| `core/domain/` ne touche ni disque ni subprocess | que le métier cesse d'être testable avec des chaînes |
+| `core/domain/` ne nomme aucun workflow | qu'une instance se range dans le vocabulaire |
+| aucune étiquette `pipeline:` sous `core/` | que le framework sache ce qu'un workflow appelle une task |
+| seul `core/runtime/filesystem/` nomme `paths` | que le global de chemins repousse |
 | tout workflow porte les **mêmes** modules à sa racine | que deux workflows cessent de se lire pareil |
 | rien d'autre que le contrat à cette racine | que le code propre remonte et recrée la situation d'avant |
 | un workflow n'importe **jamais** un autre workflow | qu'ils se relient par un détail (ce que `legacy` faisait) |
@@ -73,7 +93,7 @@ ne doit jamais toucher**. La colonne « interdit » est celle qui porte le
 design — le §2 donne la règle grossière, ceci est le détail réel extrait de
 l'AST.
 
-### `domain/` — le **vocabulaire** : ce qu'une chose *est*
+### `core/domain/` — le **vocabulaire** : ce qu'une chose *est*
 
 | Fichier | Rôle |
 | --- | --- |
@@ -98,7 +118,7 @@ Quels stages tournent, ce que `pipeline:ready` veut dire, quel texte reçoit
 quel stage sans connaître aucun workflow, et à `adapters/` de rendre des
 `Issue` sans savoir ce qu'une étiquette signifie.
 
-### `runtime/` — le support qui ne décide de rien
+### `core/runtime/` — le support qui ne décide de rien
 
 `monitoring/{logbook,metrics}.py` · `filesystem/{paths,workspace}.py`.
 `Workspace` porte une racine et les chemins qu'on en dérive ; `paths.py` ne
@@ -113,7 +133,7 @@ table du pipeline — c'était donc une politique déguisée en réglage. Elle e
 partie dans `workflows/`, et c'est ce qui a rendu `runtime/` réellement
 feuille.
 
-### `adapters/` — l'extérieur emballé
+### `core/adapters/` — l'extérieur emballé
 
 Un sous-dossier par composant externe : le moteur d'agent, le moteur de
 graphe, les binaires, le disque.
@@ -140,7 +160,7 @@ dans `agentic_dev_loop/internals/tasks.py`. `test_only_its_own_workflow_names
 _the_pipeline_labels` l'assère : aucune étiquette `pipeline:` sous
 `workflows/`.
 
-### `execution/` — la mécanique, générique par construction
+### `core/execution/` — la mécanique, générique par construction
 
 | Fichier | Rôle |
 | --- | --- |
@@ -235,7 +255,7 @@ jour où il y aura quelque chose à y mettre, l'endroit est déjà nommé.
 
 ### Les arrêts sont des valeurs
 
-`domain/outcomes/result.py` porte `Result[T]` — une valeur, ou la raison de
+`core/domain/outcomes/result.py` porte `Result[T]` — une valeur, ou la raison de
 son absence. Plus d'exceptions : une porte, une lecture d'API, un stage qui
 répond `AGENT_LOOP_STOP` **rendent** un échec que l'appelant propage
 (`recast()`, `map()`, `but()`). Les codes de sortie, préfixes et niveaux de
@@ -294,12 +314,12 @@ construire leur coûterait une lecture d'environnement.
 | **`AgentRunner`** | `default_runner(workspace)`, **à l'appel** dans `session.run` | `Ctx.runner`, ou le défaut si `None` | poser `ctx.runner`, ou remplacer `session.run` |
 | **`Git`** | `preconditions._git(cfg)`, à l'appel | rien — local à la fonction | `Git(root, run=…)` prend son `run` |
 | **la table du pipeline** | par défaut `PIPELINE`, champ de `RunConfig` | `cfg.pipeline` / `cfg.rollover` | `RunConfig(pipeline=…)` |
-| **le moteur de graphe** | `adapters/engine/__init__.py` — **la seule ligne du paquet qui nomme une implémentation** | `Flow`, `listen`, `router` importés par `flow.py` | changer cet import |
+| **le moteur de graphe** | `core/adapters/engine/__init__.py` — **la seule ligne du paquet qui nomme une implémentation** | `Flow`, `listen`, `router` importés par `flow.py` | changer cet import |
 
 ### Les trois choses à comprendre absolument
 
 **1. `StagePolicy` est le contrat qui rend `execution` générique.**
-`execution/context.py` déclare un `Protocol` : `run_id`, `dry_run`,
+`core/execution/context.py` déclare un `Protocol` : `run_id`, `dry_run`,
 `verbose`, `permission_mode`, `heartbeat_s`, `stages`, `workspace`, plus
 `enabled()`, `resolve()`, `prompt_for()`. `RunConfig` le satisfait
 **structurellement** — il n'en hérite pas et ne l'importe pas. C'est ce qui
@@ -424,20 +444,20 @@ Quatre heures, dans cet ordre, et tu as le paquet :
    4 règles. **Le fichier le plus dense
    en décisions du paquet.** 30 min.
 3. `workflows/agentic_dev_loop/stages/__init__.py` — la table. 5 min.
-4. `domain/outcomes/result.py` — comment un arrêt voyage. 10 min.
+4. `core/domain/outcomes/result.py` — comment un arrêt voyage. 10 min.
 5. `workflows/common/contract/workflow.py` — la forme que tout workflow a,
    et les quinze lignes de `sequence()`. 15 min.
 6. `workflows/agentic_dev_loop/internals/flow.py` — la séquence. 30 min.
 7. `workflows/agentic_dev_loop/internals/gates.py` — ce qui prouve. 20 min.
-8. `execution/{context,stage_runner,session}.py` — la mécanique. 40 min.
-9. `adapters/agent/base.py` puis `claude_sdk.py` — le port et son unique
+8. `core/execution/{context,stage_runner,session}.py` — la mécanique. 40 min.
+9. `core/adapters/agent/base.py` puis `claude_sdk.py` — le port et son unique
    implémentation. 20 min.
 10. `launcher/{routes,main,validation}.py` — l'entrée. 20 min.
 11. `workflows/agentic_dev_loop/internals/{board,loop}.py` et
     `preconditions.py` — le reste. 40 min.
 
-À **sauter** en première lecture : `adapters/shell/github.py` (de la
-plomberie `gh api`), `adapters/agent/progress.py`, `runtime/monitoring/`,
+À **sauter** en première lecture : `core/adapters/shell/github.py` (de la
+plomberie `gh api`), `core/adapters/agent/progress.py`, `runtime/monitoring/`,
 `launcher/cli/reports.py` (de la mise en forme), et tout `legacy/`.
 
 ---
@@ -448,7 +468,7 @@ Rien ci-dessous ne casse une règle assertée. Ce sont les endroits où j'ai
 hésité, ou que je trouve discutables. Par ordre décroissant d'intérêt.
 
 **a. `StagePolicy` `StagePolicy` n'est vérifié par rien.**
-`execution/context.py` définit un `Protocol` structurel que `RunConfig` est
+`core/execution/context.py` définit un `Protocol` structurel que `RunConfig` est
 censé satisfaire. Il n'y a **aucun type-checker** dans le projet (ni mypy ni
 pyright, ni dans `pyproject.toml` ni dans la CI). Renomme un champ de
 `RunConfig` et rien ne te le dit avant l'exécution. Soit on ajoute un
@@ -473,7 +493,7 @@ autre.
 **e. `gates.task_is_delivered` prend cinq arguments**, dont un `StageSpec`
 qui ne sert qu'à formuler un message d'erreur. Ça sent le paramètre de trop.
 
-**f. `adapters/store/resume.py` connaît le schéma sqlite de crewai.**
+**f. `core/adapters/store/resume.py` connaît le schéma sqlite de crewai.**
 Il relit la table `flow_states` que le moteur écrit, en sqlite3 de la stdlib.
 C'est un couplage à une bibliothèque externe **hors de son adaptateur** —
 assumé et documenté, parce que `--status` ne doit pas payer 1,8 s d'import
@@ -488,7 +508,7 @@ second cas d'usage vieillit mal — mais c'est le travail à faire le jour où l
 framework sort de ce dépôt.
 
 **h. Deux docstrings mentent légèrement.**
-`execution/session.py` dit assembler « le texte dans `domain.prompts` » : il
+`core/execution/session.py` dit assembler « le texte dans `domain.prompts` » : il
 ne l'importe plus, c'est la config qui compose le prompt.
 `adapters/agent/__init__.py:16` importe `Workspace` pour une annotation que
 `from __future__ import annotations` rend paresseuse — l'import ne sert donc

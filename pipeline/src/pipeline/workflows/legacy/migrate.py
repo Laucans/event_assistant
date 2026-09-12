@@ -24,12 +24,12 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from pipeline.adapters.shell.github import GitHub
-from pipeline.adapters.store import resume
+from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.adapters.store import resume
 from pipeline.workflows.legacy import migration
 from pipeline.workflows.legacy.migration import NewIssue
-from pipeline.domain.outcomes.result import Result
-from pipeline.runtime.filesystem.workspace import Workspace
+from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.workflows.common.utils import hub
 
 # Les documents traduits. Ce sont les derniers chemins du paquet qui pointent

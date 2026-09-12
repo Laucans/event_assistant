@@ -27,13 +27,13 @@ os.environ.setdefault("CREWAI_DISABLE_VERSION_CHECK", "true")
 os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
-from pipeline.adapters.shell.notify import notify  # noqa: E402
+from pipeline.core.adapters.shell.notify import notify  # noqa: E402
 from pipeline.launcher.cli import reports  # noqa: E402
-from pipeline.domain.outcomes.exit_codes import (  # noqa: E402
+from pipeline.core.domain.outcomes.exit_codes import (  # noqa: E402
     EXIT_CRASH, EXIT_HALT, EXIT_INTERRUPTED, EXIT_OK)
-from pipeline.runtime.filesystem.workspace import Workspace  # noqa: E402
-from pipeline.runtime.monitoring import logbook  # noqa: E402
-from pipeline.runtime.monitoring.logbook import Logbook  # noqa: E402
+from pipeline.core.runtime.filesystem.workspace import Workspace  # noqa: E402
+from pipeline.core.runtime.monitoring import logbook  # noqa: E402
+from pipeline.core.runtime.monitoring.logbook import Logbook  # noqa: E402
 from pipeline.workflows.agentic_dev_loop.settings import (  # noqa: E402
     ConfigError, RunConfig)
 from pipeline.workflows.agentic_dev_loop.workflow import (  # noqa: E402
