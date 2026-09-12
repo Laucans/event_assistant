@@ -14,10 +14,13 @@ iteration, **not** scale or multi-tenant robustness. Product vision:
 
 ## Project state
 
-The milestone in flight is
-`docs/current/CURRENT_MILESTONE.md`.
-The task in flight is
-`docs/current/SPEC.md`.
+Work in flight lives in **GitHub issues** on `Laucans/event_assistant`, not
+in the repo: there is no `docs/current/`, no milestone document, no spec
+file, no roadmap file. The milestone is the lowest-numbered open
+`pipeline:milestone` issue; each `pipeline:agent` sub-issue carries one
+task's SPEC in its body; `pipeline:human` sub-issues are what only the human
+can do. `scripts/agent-loop --dry-run` names the milestone and task a
+run would pick up, and calls nothing.
 
 ## Stack
 
@@ -41,6 +44,9 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 - `npm run typecheck` — runs `next typegen` before `tsc --noEmit`; the app uses
   Next's generated route types (`LayoutProps<"/">`), so bare `tsc` fails.
 - `npm run format` / `npm run format:check` — Prettier.
+- `scripts/agent-loop` / `scripts/pr-review` — shims onto the Python in
+  `pipeline/`, tested separately from `npm run test`:
+  `pipeline/.venv/bin/python -m pytest pipeline/tests`.
 
 ## Constraints that aren't visible in the code
 
@@ -68,32 +74,32 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 
 ## Workflow
 
-- Docs pipeline: `docs/PROJECT.md` + `docs/ARCHITECTURE.md` →
-  `docs/ROADMAP.md` → `docs/current/CURRENT_MILESTONE.md` →
-  `docs/current/SPEC.md` → `/tech-analyst` → implement →
-  `/archive-instructions`.
-- `/planner` writes a milestone, `/business-analyst` writes a SPEC,
-  `/tech-analyst` plans the implementation, `/code-review` runs before
-  calling work done, `/archive-instructions` files the finished spec under
-  `docs/archives/`. Implementing a SPEC is a normal session — `/clear`
-  first.
+- Pipeline: `docs/PROJECT.md` + `docs/ARCHITECTURE.md` → a
+  `pipeline:roadmap` issue → `/planner` opens a `pipeline:milestone` issue
+  and its `pipeline:agent` sub-issues → `/business-analyst` writes the SPEC
+  into a task's issue body → `/tech-analyst` plans → `/code` builds →
+  `/create-test`. `/code-review` runs before any work is called done.
+  Implementing a task is a normal session — `/clear` first.
+- **A task is done when its issue closes**, and the only thing that closes
+  one is a merged PR whose body carries `Closes #N` on its own line.
+  Nothing else marks a task finished; there is no archiving step.
+- **Only the human adds `pipeline:ready`** — nothing is picked up without
+  it, and no skill sets it. `pipeline:spec-written` is the runner's.
+- The human gate is an open `pipeline:human` issue in a task's `blocked_by`,
+  and that dependency is the whole mechanism. Read it before claiming to be
+  blocked; closing it is the human's move, never a skill's.
 - Changes to `CLAUDE.md`, `.claude/skills/`, `.claude/agents/` or
   `.claude/settings.json` go through the `vibe-specialist` subagent.
-- Human-only steps for the current SPEC live in two files:
-  `docs/current/HUMAN_ACTION.md` is the committed short list, archived with
-  the spec; `docs/current/HUMAN_ACTION_TRACKING.md` is the gitignored working
-  copy carrying the rationale, the live ticks and the human's notes. Read the
-  tracking file before claiming to be blocked, and put ticks only there.
 - Explore and plan before implementing anything touching more than one file
   (`Human_guidelines.md` §1).
 - Write a failing test before fixing a bug where practical.
 - Verification means a pass/fail signal with output shown — not "looks
   done" (§1).
 - **Every PR opened against `main_agent` gets an advisory review.** A
-  PostToolUse hook on `gh pr create` launches `scripts/pr-review.sh` detached:
+  PostToolUse hook on `gh pr create` launches `scripts/pr-review` detached:
   inline findings from `/code-review`, plus one summary comment orienting the
   human's read. It never blocks — the loop may merge the PR before the review
-  lands. Run it by hand with `scripts/pr-review.sh <pr>` (`--force` to redo a
+  lands. Run it by hand with `scripts/pr-review <pr>` (`--force` to redo a
   reviewed PR, `--dry-run` to see the prompts).
 - **Track background processes.** Anything still running after a tool call
   returns (background Bash, dev servers, watchers, tunnels) gets an entry
@@ -116,4 +122,6 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 - A PR is required, an approval is not. Once `ci` (`.github/workflows/ci.yml`)
   is green: `gh pr merge --rebase` (only method enabled; branch auto-deletes).
 - Never commit secrets. `.env.local` is gitignored; document any new
-  variable in the committed `.env.example`.
+  variable in the committed `.env.example`. **Issues on this repo are
+  public**: name a credential in an issue or PR body, never its value, and
+  keep dashboard and project URLs out.
