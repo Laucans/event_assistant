@@ -28,7 +28,7 @@ from pipeline.core.adapters.shell import binaries
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring.logbook import Logbook
-from pipeline.workflows.common.utils import hub
+from pipeline.core.adapters import hub
 
 
 class Checked(Protocol):

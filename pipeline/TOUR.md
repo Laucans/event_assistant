@@ -77,7 +77,7 @@ vivent :
 | tout workflow porte les **mêmes** modules à sa racine | que deux workflows cessent de se lire pareil |
 | rien d'autre que le contrat à cette racine | que le code propre remonte et recrée la situation d'avant |
 | un workflow n'importe **jamais** un autre workflow | qu'ils se relient par un détail (ce que `legacy` faisait) |
-| `common/` n'importe **aucun** workflow | que le contrat devienne le premier workflow, les autres accrochés dessus |
+| `common/` n'importe **aucun** workflow | que les portes communes deviennent celles du premier workflow |
 | le scan lit bien le paquet | qu'un scan vide fasse passer tout le reste |
 
 **Commence ta revue par ce fichier.** C'est le contrat, et il est exécutable.
@@ -99,7 +99,7 @@ l'AST.
 | --- | --- |
 | `issues.py` | ce qu'est une issue : numéro, titre, état, étiquettes, corps, bloqueurs |
 | `stage_spec.py` | `StageSpec` : un stage, son modèle, son effort, son texte. Plus `spec_of`/`names`, la lecture d'une table quelconque |
-| `prompts/prompt_builder.py` | le préambule, le bloc de portée, l'assemblage. **Aucune prose de stage** |
+| `prompts.py` | le préambule, le bloc de portée, l'assemblage. **Aucune prose de stage** |
 | `outcomes/stage_result.py` | ce qu'un stage rend + les marqueurs `AGENT_LOOP_OK/STOP` |
 | `outcomes/result.py` | `Result[T]` : une valeur ou la raison de son absence, et ce que chaque statut vaut dehors |
 | `outcomes/exit_codes.py` | **les codes de sortie** (contrat public) |
@@ -214,10 +214,13 @@ persisté).
 passes payantes) · `publish` (le commentaire) · `skip_rules` (quelles PR on
 ne revoit pas) · `pr` (ce qu'on lit d'une PR).
 
-`common/` porte ce qui n'appartient à aucun : `contract/` (le `Protocol`
-`Workflow`, `sequence()`, `WorkflowOutcome`, `WorkflowConfig`) et `utils/`
-(`hub` — le seul endroit qui **construit** un adaptateur — et `checks`, les
-portes communes).
+`common/` ne porte plus que `checks.py` : les portes qu'un run passe avant de
+dépenser. Le **contrat** (`Workflow`, `sequence()`, `WorkflowOutcome`,
+`WorkflowConfig`) est dans `core/execution/contract/`, et la fabrique
+d'adaptateurs dans `core/adapters/hub.py`. La ligne : le contrat décrit une
+forme et n'appartient pas à ceux qui l'adoptent ; les portes **décident** de
+ce qui est exigé, et `ci_triggers_on_the_branch` encode la façon de travailler
+de ce dépôt — un troisième workflow peut en vouloir de tout autres.
 
 `legacy/migrate.py` : la bascule, une fois. **Ce n'est pas un workflow** —
 elle meurt entière, et le scan de forme l'exempte nommément.
@@ -226,7 +229,7 @@ elle meurt entière, et le scan de forme l'exempte nommément.
 **La règle est désormais écrite et assertée** : un workflow n'importe jamais
 un autre workflow, et `common/` n'en importe aucun. C'est ce qui rend le
 troisième workflow facile. `legacy/migrate` ne triche plus : il prend sa
-fabrique de client dans `common.utils.hub` au lieu d'importer
+fabrique de client dans `core/adapters/hub.py` au lieu d'importer
 `agentic_dev_loop.board` — l'ancien point (d) du §6.
 
 L'arbre interne d'`agentic_dev_loop` :
@@ -345,7 +348,7 @@ du module — un singleton global impossible à remplacer. C'est aujourd'hui
 motif ailleurs, c'est un bug.
 
 **3. La couture unique de GitHub.**
-Tout le paquet passe par `common/utils/hub.py` pour obtenir un client.
+Tout le paquet passe par `core/adapters/hub.py` pour obtenir un client.
 Résultat : une seule ligne de `tests/conftest.py` —
 `monkeypatch.setattr(adapters, "github", lambda root: github.GitHub(root, run=fake))`
 — met GitHub sur papier **simultanément** pour le round, la boucle, le
@@ -445,7 +448,7 @@ Quatre heures, dans cet ordre, et tu as le paquet :
    en décisions du paquet.** 30 min.
 3. `workflows/agentic_dev_loop/stages/__init__.py` — la table. 5 min.
 4. `core/domain/outcomes/result.py` — comment un arrêt voyage. 10 min.
-5. `workflows/common/contract/workflow.py` — la forme que tout workflow a,
+5. `core/execution/contract/workflow.py` — la forme que tout workflow a,
    et les quinze lignes de `sequence()`. 15 min.
 6. `workflows/agentic_dev_loop/internals/flow.py` — la séquence. 30 min.
 7. `workflows/agentic_dev_loop/internals/gates.py` — ce qui prouve. 20 min.
@@ -487,7 +490,7 @@ graphe.
 **d. `workflows/legacy/migrate.py` importait le workflow vivant.**
 `from pipeline.workflows.agentic_dev_loop import board`, pour une fabrique de
 client de trois lignes. **Réglé** : cette fabrique est dans
-`common/utils/hub.py`, et un test assère qu'aucun workflow n'en importe un
+`core/adapters/hub.py`, et un test assère qu'aucun workflow n'en importe un
 autre.
 
 **e. `gates.task_is_delivered` prend cinq arguments**, dont un `StageSpec`

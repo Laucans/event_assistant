@@ -9,7 +9,7 @@ The message shapes live in `sdk_shapes`, shared with `test_progress`, which
 feeds the same classes straight to `Progress`. The issue store lives in
 `fake_github`, and the `hub` fixture below plugs it in where the round, the
 loop, the preconditions, the review and `--status` all look for `gh` — one
-seam, because `workflows.common.utils.hub` is the one place any of them
+seam, because `core.adapters.hub` is the one place any of them
 builds a client.
 """
 
@@ -108,7 +108,7 @@ def hub(monkeypatch):
     exercise the API paths it builds, not a mock of them.
     """
     from pipeline.core.adapters.shell import github
-    from pipeline.workflows.common.utils import hub as adapters
+    from pipeline.core.adapters import hub as adapters
 
     fake = FakeGitHub()
     monkeypatch.setattr(adapters, "github",

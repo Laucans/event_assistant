@@ -1,15 +1,25 @@
-"""L'assemblage d'un prompt de stage — la mecanique, pas le texte.
+"""Le preambule, le bloc de portee, et comment ils se composent.
+
+Ce que **toute** session recoit, quel que soit le workflow qui la lance :
+le bloc EXECUTION CONTEXT — la ou il est dit qu'on ne peut poser aucune
+question, comment s'arreter, et sur quelle branche on travaille — et le bloc
+SCOPE, qui porte le milestone et l'issue. Les consignes propres a un stage
+s'ajoutent a ca et ne sont pas ici : elles voyagent dans
+`StageSpec.instructions`.
 
 Le preambule et les blocs de portee ont ete repris caractere pour caractere
 de l'ancien `scripts/agent-loop.sh` : c'est ce qui rend demontrable, par
 diff, que la migration n'a rien change a ce que les stages recoivent. La
 seule difference voulue est le nom de l'injecteur.
 
-**Ce module ne connait aucun workflow.** La prose propre a un stage voyage
-dans `StageSpec.instructions` et lui est passee en argument ; le registre
-`definitions` qui vivait ici indexait des noms de stages d'un workflow
-precis, ce qui faisait du vocabulaire qui nomme une instance. Il vit
-maintenant dans `workflows/<nom>/stages/`.
+**Ce module ne connait aucun workflow.** La prose d'un stage lui est passee
+en argument ; le registre `definitions` qui vivait a cote indexait des noms
+de stages d'un workflow precis, ce qui faisait du vocabulaire qui nomme une
+instance. Il vit maintenant dans `workflows/<nom>/stages/`.
+
+Le preambule exige `AGENT_LOOP_OK:` en fin de reponse et
+`outcomes.stage_result.read_markers` le lit : deux moities d'un meme
+contrat, et un test exige qu'elles nomment la meme chaine.
 """
 
 # Le nom cite dans le preambule quand l'appelant n'en donne pas d'autre.

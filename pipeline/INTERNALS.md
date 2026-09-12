@@ -142,7 +142,7 @@ l'importer, et il n'aurait déjà plus rien à y faire.
 | --- | --- |
 | `issues.py` | la forme d'une issue : numéro, titre, état, étiquettes, corps, bloqueurs |
 | `stage_spec.py` | `StageSpec`, les niveaux d'effort, et `spec_of`/`names` — la lecture d'une table quelconque |
-| `prompts/prompt_builder.py` | le préambule, la portée et la composition, repris au bit près du shell |
+| `prompts.py` | le préambule, la portée et la composition, repris au bit près du shell |
 | `outcomes/stage_result.py` | ce qu'un stage rend, et les marqueurs `AGENT_LOOP_OK` / `AGENT_LOOP_STOP` |
 | `outcomes/result.py` | `Result[T]` : une valeur, ou la raison de son absence — et ce que chaque statut vaut dehors |
 | `outcomes/exit_codes.py` | les codes de sortie qu'un ordonnanceur extérieur lit |
@@ -200,11 +200,11 @@ un workflow qui en importe un autre, les fait échouer.
 
 | Module commun | Rôle |
 | --- | --- |
-| `common/contract/workflow.py` | le `Protocol` `Workflow`, et `sequence()` — les quatre lignes qu'aucun workflow ne réécrit |
-| `common/contract/outcome.py` | `WorkflowOutcome` : ce qu'un workflow rend à son lanceur |
-| `common/contract/settings.py` | `WorkflowConfig` : workspace, `--dry-run`, verbosité, battement |
-| `common/utils/hub.py` | `gh()` et `repo()` — le seul endroit du paquet qui **construit** un adaptateur |
-| `common/utils/checks.py` | les portes qui ne sont propres à aucun workflow : `claude`/`gh` sur le PATH, `gh` authentifié, la branche d'intégration, l'arbre propre |
+| `core/execution/contract/workflow.py` | le `Protocol` `Workflow`, et `sequence()` — les quatre lignes qu'aucun workflow ne réécrit |
+| `core/execution/contract/outcome.py` | `WorkflowOutcome` : ce qu'un workflow rend à son lanceur |
+| `core/execution/contract/settings.py` | `WorkflowConfig` : workspace, `--dry-run`, verbosité, battement |
+| `core/adapters/hub.py` | `gh()` et `repo()` — le seul endroit du paquet qui **construit** un adaptateur |
+| `common/checks.py` | les portes qui ne sont propres à aucun workflow : `claude`/`gh` sur le PATH, `gh` authentifié, la branche d'intégration, l'arbre propre |
 
 | Interne à un workflow | Rôle |
 | --- | --- |

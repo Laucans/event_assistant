@@ -446,16 +446,25 @@ def test_a_workflow_never_imports_another_workflow():
 
 
 def test_the_common_package_never_imports_a_workflow():
-    """Le contrat ne connait aucun de ses implementeurs.
+    """Les portes communes ne connaissent aucun des workflows qui les passent.
 
-    Sinon il ne serait pas un contrat : il serait le premier workflow, avec
-    les autres accroches dessus.
+    Sinon elles ne seraient pas communes : elles seraient celles du premier
+    workflow, avec les autres accroches dessus.
+
+    La regle couvrait aussi le contrat, qui vit maintenant dans
+    `core/execution/contract/` — la ou
+    `test_nothing_under_core_knows_a_workflow_or_the_launcher` le tient, avec
+    tout le reste du framework. Ce qui reste ici est de la politique : quelles
+    portes un run doit passer.
     """
+    scanned = 0
     faults = []
     for path in sorted((SRC / "workflows" / "common").rglob("*.py")):
+        scanned += 1
         for module in imports(path):
             parts = module.split(".")
             if (len(parts) > 2 and parts[1] == "workflows"
                     and parts[2] != "common"):
                 faults.append(f"{path.relative_to(SRC)} -> {module}")
-    assert not faults, "le contrat connait un workflow : %s" % faults
+    assert not faults, "les portes communes connaissent un workflow : %s" % faults
+    assert scanned, "le scan ne lit plus rien"

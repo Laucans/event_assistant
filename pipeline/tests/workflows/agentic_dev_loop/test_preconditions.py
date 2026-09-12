@@ -3,11 +3,11 @@
 Every check here cost a run to write: a typo in the table costs nothing to
 find before the first `claude`, and a whole stage to find after. None of it
 was tested — and these tests run no git, no gh, no claude: the adapters are
-replaced where they are built (`common.utils.hub`) and where they look on the
+replaced where they are built (`core.adapters.hub`) and where they look on the
 PATH (`adapters.shell.binaries`).
 
 Les portes elles-memes vivent a deux endroits depuis qu'elles sont partagees :
-les communes dans `common.utils.checks`, celles de la boucle ici. Ce fichier
+les communes dans `common.checks`, celles de la boucle ici. Ce fichier
 exerce la liste composee — c'est elle qui tourne vraiment.
 """
 
@@ -29,7 +29,7 @@ from pipeline.workflows.agentic_dev_loop.preconditions import LoopPreconditions
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.workflows.agentic_dev_loop.stages import PIPELINE
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
-from pipeline.workflows.common.utils import hub as adapters
+from pipeline.core.adapters import hub as adapters
 
 
 class Shell:

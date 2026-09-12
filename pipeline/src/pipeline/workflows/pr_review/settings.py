@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.workflows.common.contract.settings import WorkflowConfig
+from pipeline.core.execution.contract.settings import WorkflowConfig
 
 
 # `kw_only` restaure ce que l'heritage avait perdu : `pr` et `base` n'ont pas

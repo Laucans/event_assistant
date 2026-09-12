@@ -23,8 +23,8 @@ from pipeline.workflows.agentic_dev_loop.postconditions import (
 from pipeline.workflows.agentic_dev_loop.preconditions import (
     LoopPreconditions)
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
-from pipeline.workflows.common.contract import workflow as contract
-from pipeline.workflows.common.contract.outcome import WorkflowOutcome
+from pipeline.core.execution.contract import workflow as contract
+from pipeline.core.execution.contract.outcome import WorkflowOutcome
 
 
 @dataclass
