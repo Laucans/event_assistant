@@ -1,7 +1,9 @@
 """Les tables que `--costs` imprime, dont la premiere est celle du shell.
 
 Le registre est ecrit avec `ledger.append` : c'est le constructeur de
-fixtures le plus honnete, puisque c'est ce qui l'ecrit en production.
+fixtures le plus honnete, puisque c'est ce qui l'ecrit en production. Seule
+la comparaison a l'oracle lit un fichier, `oracle/costs.tsv` : c'est le
+registre exact dont `oracle/costs-report.txt` est la sortie.
 """
 
 import pytest
@@ -18,8 +20,12 @@ def test_report_matches_the_shell_output():
 
     Les metriques ajoutees depuis vivent dans une section separee par une
     ligne vide, precisement pour que cette comparaison reste possible.
+
+    L'entree est committee : lire `Workspace.here().ledger` faisait dependre
+    le test du registre local, que `.llocal/` gitignore — un oracle dont la
+    sortie etait au depot mais pas l'entree.
     """
-    core = reports.report(Workspace.here().ledger).split("\n\n")[0]
+    core = reports.report(ORACLE / "costs.tsv").split("\n\n")[0]
     assert core == (ORACLE / "costs-report.txt").read_text(
         encoding="utf-8").rstrip("\n")
 

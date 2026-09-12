@@ -6,6 +6,7 @@ with the exit code it returned.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -22,7 +23,20 @@ ENTRY = ORACLE.parents[2] / "scripts" / "hooks" / "branch-guard.py"
 # `.claude/settings.json` invoque les hooks avec `python3` : le python du
 # systeme, hors du venv. C'est lui qu'il faut utiliser ici, sinon le test
 # s'appuie sur un `pipeline` installe que la production n'a pas.
-SYSTEM_PY = shutil.which("python3") or sys.executable
+def _system_python():
+    venv_bin = os.path.realpath(os.path.join(sys.prefix, "bin"))
+    path = os.pathsep.join(
+        d for d in os.environ.get("PATH", "").split(os.pathsep)
+        if d and os.path.realpath(d) != venv_bin)
+    # Repli : `sys.executable`, le seul chemin dont on sait qu'il existe.
+    # `base_prefix/bin/python3` n'existe pas partout (le framework Homebrew
+    # n'a que `python3.13`) et donnait un FileNotFoundError illisible. Que le
+    # repli soit le python du venv n'affaiblit rien : c'est `sans_pipeline`,
+    # pas le choix de l'interpreteur, qui garantit l'echec d'import.
+    return shutil.which("python3", path=path) or sys.executable
+
+
+SYSTEM_PY = _system_python()
 
 
 def run_entry(cmd):
@@ -108,8 +122,27 @@ ORPHANS = [("branch-guard.py", 2), ("no-secret-paths.py", 2),
            ("scratchpad-notice.py", 0), ("pr-review-trigger.py", 0)]
 
 
+@pytest.fixture
+def sans_pipeline(tmp_path):
+    """L'environnement ou `import pipeline` echoue, sur n'importe quelle machine.
+
+    Copier l'entree hors du depot casse son `sys.path.insert` — mais seulement
+    si rien d'autre ne fournit le paquet. La CI fait `pip install -e pipeline`
+    dans le python meme qui lance les hooks : l'orphelin s'y importait tres
+    bien et la garde se taisait — trois tests verts en local, rouges sur la
+    CI. Un `pipeline` qui leve, place en tete de PYTHONPATH, reproduit la
+    panne partout au lieu de dependre de ce que la machine a installe.
+    """
+    shim = tmp_path / "shim"
+    (shim / "pipeline").mkdir(parents=True)
+    (shim / "pipeline" / "__init__.py").write_text(
+        'raise ImportError("pipeline indisponible")\n', encoding="utf-8")
+    return {**os.environ, "PYTHONPATH": str(shim)}
+
+
 @pytest.mark.parametrize("name, expected", ORPHANS)
-def test_a_hook_that_cannot_load_fails_the_right_way(name, expected, tmp_path):
+def test_a_hook_that_cannot_load_fails_the_right_way(name, expected, tmp_path,
+                                                    sans_pipeline):
     """Revue du 2026-09-09, finding n°4.
 
     Copiee hors du depot, l'entree ne trouve plus `pipeline.launcher` : les hooks
@@ -122,12 +155,12 @@ def test_a_hook_that_cannot_load_fails_the_right_way(name, expected, tmp_path):
     r = subprocess.run(
         [SYSTEM_PY, str(orphan)],
         input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}}),
-        capture_output=True, text=True)
+        capture_output=True, text=True, env=sans_pipeline)
     assert r.returncode == expected, r.stderr
 
 
-def test_the_system_python_really_cannot_import_the_package():
+def test_the_orphan_really_cannot_import_the_package(sans_pipeline):
     """Guard for the test above: without this fact it would pass vacuously."""
     r = subprocess.run([SYSTEM_PY, "-c", "import pipeline"],
-                       capture_output=True, text=True, cwd="/")
+                       capture_output=True, text=True, cwd="/", env=sans_pipeline)
     assert r.returncode != 0
