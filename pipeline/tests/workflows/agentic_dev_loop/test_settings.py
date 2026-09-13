@@ -7,8 +7,8 @@ table est un design, la config est un etat de run lu dans l'environnement.
 import pytest
 
 from pipeline.workflows.agentic_dev_loop.stages import PIPELINE
-from pipeline.workflows.agentic_dev_loop.settings import (
-    ConfigError, RunConfig)
+from pipeline.core.execution.contract.settings import ConfigError
+from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 
 
 def test_stage_filter_selects_a_subset():

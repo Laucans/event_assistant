@@ -150,6 +150,7 @@ hub.repo(cfg.workspace)    # git
 - Les postconditions ne tournent pas sur un travail qui a échoué.
 - `gate.py` : `Check`, `Checked`, `verify_all`. La forme d'un preflight.
 - `settings.py` : `WorkflowConfig`. Satisfait `StagePolicy` sauf `prompt_for`.
+- `settings.py` : `env_number`, et `ConfigError` — seule exception levée. Une config qui ne se construit pas n'a pas d'appelant.
 - `outcome.py` : `WorkflowOutcome`. Un `Result[None]` plus un `summary`.
 
 ### Faire tourner

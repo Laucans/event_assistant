@@ -112,7 +112,6 @@ WORKFLOW = Blueprint(
 | `record` | ligne dans `costs.tsv` | `ReviewConfig` (registre séparé) |
 
 - Champs communs : `dry_run`, `verbose`, `quiet`, `heartbeat_s`, `workspace`, `run_id`, `permission_mode`, `stages`.
-- `ConfigError` : seule exception levée. Une config qui ne se construit pas n'a pas d'appelant.
 
 ## Portes
 
