@@ -14,8 +14,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from pipeline.core.adapters.agent import AgentRunner
-from pipeline.core.adapters.shell.github import GitHub
 from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.core.execution.contract import workflow as contract
 from pipeline.core.execution.contract.outcome import WorkflowOutcome
@@ -31,16 +29,13 @@ class PrReview:
 
     Satisfait `contract.Workflow` sans en heriter, comme la boucle.
 
-    `gh`, `runner` et `warn` sont les coutures : un test passe ses doubles,
-    et le CLI branche `warn` sur stderr — le hook lance la revue **detachee**,
-    donc c'est le seul canal qu'un appelant qui n'ouvre pas le fichier de log
-    verra passer.
+    `warn` est la couture : le CLI le branche sur stderr — le hook lance la
+    revue **detachee**, donc c'est le seul canal qu'un appelant qui n'ouvre
+    pas le fichier de log verra passer.
     """
 
     config: ReviewConfig
     log: Logbook
-    gh: GitHub | None = None
-    runner: AgentRunner | None = None
     warn: Callable[[str], None] | None = None
     preconditions: ReviewPreconditions = field(init=False)
     postconditions: ReviewPostconditions = field(init=False)
@@ -55,5 +50,4 @@ class PrReview:
 
     async def execute(self) -> WorkflowOutcome:
         """La revue, une fois les outils verifies."""
-        return await review.run(self.config, self.log, gh=self.gh,
-                                runner=self.runner, warn=self.warn)
+        return await review.run(self.config, self.log, warn=self.warn)
