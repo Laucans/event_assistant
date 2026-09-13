@@ -3,7 +3,7 @@
 The unattended runner for this project. It spends a budget of Claude Code
 sessions against GitHub issues, one task per round. Mechanics — the journal,
 the exit codes, the cost ledger, the layering rules — live in
-`pipeline/INTERNALS.md`.
+`pipeline/ARCHITECTURE.md` and the one in each package.
 
 ## One round
 
@@ -56,7 +56,7 @@ The runner injects both, so a session cannot start without its scope.
 
 ## Setup
 
-Beyond the venv (see `INTERNALS.md`), the seven labels have to exist. Preflight
+Beyond the venv (see `ARCHITECTURE.md`), the seven labels have to exist. Preflight
 refuses to run without them and prints the exact commands:
 
     gh label create pipeline:roadmap

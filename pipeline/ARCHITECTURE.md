@@ -98,7 +98,6 @@ pipeline/.venv/bin/pip install -e 'pipeline[dev]'
 | `src/pipeline/core/ARCHITECTURE.md` | le framework, couche par couche |
 | `src/pipeline/workflows/ARCHITECTURE.md` | ce qu'est un workflow, et de quoi il est fait |
 | `src/pipeline/launcher/ARCHITECTURE.md` | routage, protocoles, codes de sortie |
-| `src/pipeline/workflows/how_to_design_a_workflow.md` | en ajouter un |
-| `TOUR.md`, `INTERNALS.md` | historique et détail module par module |
 
-- `TOUR.md` et `INTERNALS.md` précèdent le passage aux blueprints. Vérifier contre le code.
+- Ces cinq fichiers sont les seuls documents de référence. Le détail est dans le code.
+- `TOUR.md` et `INTERNALS.md` ont été supprimés : ils précédaient le passage aux blueprints.

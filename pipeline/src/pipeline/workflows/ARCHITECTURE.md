@@ -1,6 +1,6 @@
 # Architecture — `workflows/`
 
-Comment ajouter un workflow : `how_to_design_a_workflow.md`.
+Le framework : `../core/ARCHITECTURE.md`. Les entrées : `../launcher/ARCHITECTURE.md`.
 
 ## Périmètre
 
@@ -174,6 +174,46 @@ binaries.shutil                             # PATH ; résolu à l'appel
 | `test_every_module_a_docstring_names_still_exists` | un pointeur mort |
 
 - Les workflows sont découverts, pas listés. Un troisième est vérifié sans intervention.
+
+## Ajouter un workflow
+
+1. Copier `pr_review/` — le plus petit, il montre la forme complète.
+2. `settings.py`, `preconditions.py`, `stages/`, `internals/`.
+3. `workflow.py` : le `Blueprint`.
+4. Brancher la commande (ci-dessous).
+5. `tests/workflows/<nom>/`, et la config minimale dans `CONFIGS` de `test_shape.py`.
+
+```python
+# settings.py — kw_only seulement si un champ n'a pas de défaut.
+@dataclass(kw_only=True)
+class MaConfig(WorkflowConfig):
+    cible: str
+
+    def prompt_for(self, stage, extra) -> str:
+        return prompts.build(stage.command, ..., extra)
+
+# preconditions.py — pas de classe : le blueprint reçoit CHECKS.
+CHECKS: tuple[Check, ...] = (*checks.TOOLING, Check("ma-porte", ma_porte))
+
+# workflow.py — la déclaration entière.
+WORKFLOW = Blueprint(
+    name="mon-workflow", config=MaConfig, gates=preconditions.CHECKS,
+    artifacts=lambda cfg: cfg.workspace.llocal / "mon-workflow",
+    shape=Once(plan=stages.etapes, state=MonEtat, extra=stages.prompt_of),
+)
+```
+
+- Un champ sans défaut ne peut pas suivre les champs défautés du parent.
+- Sans `kw_only`, il faudrait inventer une valeur vide. Le workflow se construirait sans sa cible.
+
+## Pièges
+
+- **N'exprime pas ta séquence en graphe.** Celle du round l'a été.
+- Coût constaté : 1,6 s d'import, un `if stopped: return` par nœud, six membres d'état.
+- Un moteur déclenche le nœud suivant quelle que soit la valeur de retour du précédent.
+- Une séquence qui rend au premier échec n'a besoin d'aucun des trois.
+- Un graphe ne se paie qu'avec de vraies branches. Plusieurs, et qui se rejoignent.
+- Le round n'en avait qu'une, le rollover. C'est un `if`.
 
 ## Brancher une commande
 
