@@ -1,41 +1,36 @@
-"""La revue consultative d'une PR, de bout en bout.
+"""Ce que la revue etablit avant de payer, et le verrou qu'elle tient.
 
-Deux passes `claude -p` sur la meme PR, toutes deux livrees sur la PR :
+Ce module ne fait plus tourner les passes : elles sont dans la table de
+`stages/`, et la forme `Once` les enchaine. Ce qui reste ici est ce qui
+entoure la sequence — lire la PR, decider qu'il n'y a rien a revoir, et ne
+pas la revoir deux fois a la fois.
 
-1. `/code-review <niveau> <pr> --comment` — les findings postes en ligne, sur
-   le fichier:ligne qu'ils concernent ;
-2. les notes du relecteur — un commentaire de synthese : ce que fait le lot,
-   ou regarder d'abord, ce que l'agent a suppose, ce qui merite une question.
-
-Consultative : elle ne bloque rien, ne merge rien, ne touche aucune branche.
-La boucle peut merger la PR pendant que la revue s'ecrit encore.
-
-Les regles qui decident qu'une PR n'a pas a etre revue vivent dans
-`skip_rules`, les deux passes dans `passes`, le commentaire dans `publish`.
-Ce module est l'orchestration, et rien d'autre.
+**Une revue sautee est un succes**, pas un manquement : une PR en brouillon
+ou deja revue n'a rien a obtenir. C'est ce que le pre-controle d'une forme
+rend en une phrase plutot qu'en un echec.
 """
 
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable
 from pathlib import Path
 
-from pipeline.core.adapters.agent import AgentRunner
-from pipeline.core.adapters.shell.github import GitHub
-from pipeline.core.domain.outcomes.result import Result
-from pipeline.core.runtime.monitoring.logbook import Logbook
-from pipeline.core.execution.contract.outcome import WorkflowOutcome
 from pipeline.core.adapters import hub as adapters
-from pipeline.workflows.pr_review.internals import passes, publish
+from pipeline.core.domain.outcomes.result import Result
 from pipeline.workflows.pr_review.internals.pr import Pr
 from pipeline.workflows.pr_review.internals.skip_rules import (
     PR_FIELDS, skip_reason)
-from pipeline.workflows.pr_review.settings import ReviewConfig
 
 
-def _cannot(warn: Callable[[str], None] | None, said: str,
-            channel: str) -> Result[None]:
+class ReviewState:
+    """Ce que les etapes de la revue se transmettent."""
+
+    def __init__(self) -> None:
+        self.stages_done: list[str] = []
+        self.pr: Pr | None = None
+
+
+def _cannot(cfg, said: str, channel: str) -> Result[str]:
     """Une lecture qui n'a pas abouti.
 
     Rien n'est journalise ici : la raison voyage dans le `Result`, et le
@@ -46,9 +41,37 @@ def _cannot(warn: Callable[[str], None] | None, said: str,
     hook, donc ce qui ne va que dans le fichier de log n'apparait devant
     personne. C'est la ligne directe vers l'operateur.
     """
-    if warn is not None:
-        warn(channel)
+    if cfg.warn is not None:
+        cfg.warn(channel)
     return Result.fail(said)
+
+
+def precheck(cfg, log, state: ReviewState) -> Result[str]:
+    """Y a-t-il quelque chose a revoir ? Pose la PR dans l'etat au passage."""
+    gh = adapters.gh(cfg.workspace)
+
+    meta, why = gh.pr(cfg.pr, PR_FIELDS)
+    if meta is None:
+        return _cannot(cfg, f"cannot read PR {cfg.pr} — {why}",
+                       f"pr-review: cannot read PR {cfg.pr}")
+    state.pr = Pr.of(meta)
+
+    comments = ""
+    if not cfg.force:
+        comments, why = gh.comment_bodies(state.pr.num)
+        if comments is None:
+            return _cannot(
+                cfg,
+                f"cannot tell whether PR #{state.pr.num} was already reviewed"
+                f" — {why}",
+                f"pr-review: cannot read the comments of PR #{state.pr.num}")
+
+    skip = skip_reason(cfg, meta, comments)
+    if skip:
+        return Result.of(f"skip — {skip}")
+    pr = state.pr
+    log(f"reviewing #{pr.num}  {pr.head} -> {pr.base}  ({pr.title})")
+    return Result.of("")
 
 
 @contextlib.contextmanager
@@ -71,59 +94,17 @@ def claim(review_dir: Path, num: str):
             lock.rmdir()
 
 
-async def _both_passes(cfg: ReviewConfig, pr: Pr, log: Logbook, gh: GitHub,
-                       runner: AgentRunner | None) -> WorkflowOutcome:
-    """Les deux passes et la publication, une fois le verrou tenu."""
-    log(f"reviewing #{pr.num}  {pr.head} -> {pr.base}  ({pr.title})")
+def one_at_a_time(cfg, state: ReviewState):
+    """Le garde de la forme : au plus une revue de cette PR a la fois."""
+    return claim(cfg.workspace.review_dir, state.pr.num)
 
-    found = await passes.findings(cfg, pr, log, runner)
-    if found.failed:
-        return WorkflowOutcome.of_result(found)
 
-    body = await passes.brief(cfg, pr, found.value, log, runner)
-    if body.failed:
-        return WorkflowOutcome.of_result(body)
+def already_running(cfg, state: ReviewState) -> str:
+    return f"skip — a review of PR #{state.pr.num} is already running"
+
+
+def summary(cfg, state: ReviewState) -> str:
+    """La ligne qu'une revue arrivee au bout laisse derriere elle."""
     if cfg.dry_run:
-        log("dry run — nothing posted")
-        return WorkflowOutcome.done("dry run — nothing posted")
-
-    posted = publish.publish(cfg, pr.num, pr.url, body.value, log, gh)
-    if posted.failed:
-        return WorkflowOutcome.of_result(posted)
-    return WorkflowOutcome.done(f"reviewed #{pr.num}")
-
-
-async def run(cfg: ReviewConfig, log: Logbook, *, gh: GitHub | None = None,
-              runner: AgentRunner | None = None,
-              warn: Callable[[str], None] | None = None) -> WorkflowOutcome:
-    """Fait la revue, et rend ce que le CLI propage en code de sortie."""
-    gh = gh or adapters.gh(cfg.workspace)
-
-    meta, why = gh.pr(cfg.pr, PR_FIELDS)
-    if meta is None:
-        return WorkflowOutcome.of_result(_cannot(
-            warn, f"cannot read PR {cfg.pr} — {why}",
-            f"pr-review: cannot read PR {cfg.pr}"))
-    pr = Pr.of(meta)
-
-    comments = ""
-    if not cfg.force:
-        comments, why = gh.comment_bodies(pr.num)
-        if comments is None:
-            return WorkflowOutcome.of_result(_cannot(
-                warn,
-                f"cannot tell whether PR #{pr.num} was already reviewed"
-                f" — {why}",
-                f"pr-review: cannot read the comments of PR #{pr.num}"))
-
-    skip = skip_reason(cfg, meta, comments)
-    if skip:
-        log(f"skip — {skip}")
-        return WorkflowOutcome.done(f"skip — {skip}")
-
-    with claim(cfg.workspace.review_dir, pr.num) as mine:
-        if not mine:
-            said = f"skip — a review of PR #{pr.num} is already running"
-            log(said)
-            return WorkflowOutcome.done(said)
-        return await _both_passes(cfg, pr, log, gh, runner)
+        return "dry run — nothing posted"
+    return f"reviewed #{state.pr.num}"

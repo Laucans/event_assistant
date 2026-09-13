@@ -25,7 +25,8 @@ from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook
 from pipeline.core.adapters.shell import binaries
 from pipeline.core.adapters.shell.git import Git
-from pipeline.workflows.agentic_dev_loop.preconditions import LoopPreconditions
+from pipeline.core import design
+from pipeline.workflows.agentic_dev_loop.workflow import WORKFLOW
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.workflows.agentic_dev_loop.stages import PIPELINE
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
@@ -105,7 +106,8 @@ def cfg(repo, **kw):
 
 def verify(repo, log=None, **kw):
     """Le preflight, tel que la sequence du contrat l'appelle."""
-    return LoopPreconditions(cfg(repo, **kw), log or logbook.null()).verify()
+    built = design.workflow(WORKFLOW, cfg(repo, **kw), log or logbook.null())
+    return built.preconditions.verify()
 
 
 def test_a_repository_in_order_passes_and_says_where_it_starts(repo, said):

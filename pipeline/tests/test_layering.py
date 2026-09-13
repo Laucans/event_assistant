@@ -58,10 +58,14 @@ ALLOWED: dict[str, set[str]] = {
     # pas workflows : c'est ce que le `Protocol` StagePolicy existe pour eviter
     "core/execution": {"core/adapters", "core/domain", "core/runtime",
                        "core/execution"},
-    "workflows": {"core/adapters", "core/domain", "core/execution",
-                  "core/runtime", "workflows"},
-    "launcher": {"core/adapters", "core/domain", "core/execution",
-                 "core/runtime", "launcher", "workflows"},
+    # `design` est la couche d'authoring : elle nomme la forme d'un workflow
+    # sans en connaitre aucun, d'ou sa place dans core/ malgre son sujet.
+    "core/design": {"core/design", "core/domain", "core/execution",
+                    "core/runtime"},
+    "workflows": {"core/adapters", "core/design", "core/domain",
+                  "core/execution", "core/runtime", "workflows"},
+    "launcher": {"core/adapters", "core/design", "core/domain",
+                 "core/execution", "core/runtime", "launcher", "workflows"},
 }
 
 # Ce qui doit rester chargeable par le python du systeme, hors du venv : les
@@ -173,13 +177,28 @@ def test_nothing_under_core_knows_a_workflow_or_the_launcher():
     assert not faults, "le framework connait son utilisateur : %s" % faults
 
 
+def _is_type_checking(node) -> bool:
+    """`if TYPE_CHECKING:` — un bloc que l'interpreteur ne prend jamais."""
+    test = getattr(node, "test", None)
+    return (isinstance(node, ast.If) and isinstance(test, ast.Name)
+            and test.id == "TYPE_CHECKING")
+
+
 def module_level_imports(path: pathlib.Path) -> list[str]:
-    """Ce qu'un simple `import <ce module>` executerait, corps de fonction exclus."""
+    """Ce qu'un simple `import <ce module>` executerait.
+
+    Corps de fonction exclus, et blocs `if TYPE_CHECKING:` avec : ils ne
+    tournent pas, donc ce qu'ils importent ne coute rien et n'atteint aucune
+    couche a l'execution. C'est ce qui permet d'annoter avec un type lourd
+    sans le charger.
+    """
     found: list[str] = []
 
     def walk(node):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if _is_type_checking(child):
                 continue
             if isinstance(child, ast.Import):
                 found.extend(alias.name for alias in child.names)
@@ -190,6 +209,48 @@ def module_level_imports(path: pathlib.Path) -> list[str]:
 
     walk(ast.parse(path.read_text(encoding="utf-8"), str(path)))
     return found
+
+
+# Ce qu'un blueprint fait charger rien qu'en etant lu. `--status` et `--costs`
+# importent le module `workflow.py` de la boucle, donc sa declaration, donc
+# tout ce que la declaration nomme : si `Shape` tirait le lanceur de stages,
+# imprimer deux lignes paierait l'import du moteur d'agent.
+DECLARATION_ONLY = ("core/design/blueprint.py", "core/design/build.py",
+                    "core/design/__init__.py",
+                    "core/execution/shapes/__init__.py",
+                    "core/execution/shapes/repeat.py")
+
+# Ce qu'aucun de ceux-la n'a le droit de charger : la session payante et ce
+# qu'elle tire derriere elle.
+THE_ENGINE = ("pipeline.core.execution.session",
+              "pipeline.core.execution.stage_runner",
+              "pipeline.core.execution.context",
+              "pipeline.core.adapters.agent")
+
+
+@pytest.mark.parametrize("here", DECLARATION_ONLY)
+def test_declaring_a_workflow_does_not_load_the_engine(here):
+    """Declarer n'est pas executer, et le chemin rapide en depend.
+
+    Mesure : avec `Ctx` et `StageRunner` importes au niveau module,
+    `agent-loop --status` chargeait `adapters.agent` — asyncio et pydantic —
+    pour repondre une ligne. Les deux ne servaient qu'a l'annotation.
+    """
+    loaded = module_level_imports(SRC / here)
+    faults = [m for m in loaded
+              if any(m == e or m.startswith(e + ".") for e in THE_ENGINE)]
+    assert not faults, (
+        f"{here} charge le moteur rien qu'en etant lu : {faults} —"
+        f" mets-les sous TYPE_CHECKING, ou importe-les dans un corps")
+
+
+def test_the_declaration_scan_reads_files_that_exist():
+    """Un scan sur un chemin faux passerait sans rien verifier."""
+    for here in DECLARATION_ONLY:
+        assert (SRC / here).exists(), here
+    # Et le garde-fou du garde-fou : la regle mord bien sur quelque chose.
+    assert any(m.startswith("pipeline.core.adapters.agent")
+               for m in module_level_imports(SRC / "core/execution/session.py"))
 
 
 def stdlib_only() -> list[pathlib.Path]:
@@ -366,8 +427,10 @@ NOT_A_WORKFLOW = {"common", "legacy"}
 # Les modules que tout workflow porte a sa racine, et la classe attendue dans
 # chacun. `internals/` porte le reste, et n'a pas a se ressembler d'un
 # workflow a l'autre.
-ROOT_MODULES = ("workflow.py", "settings.py", "preconditions.py",
-                "postconditions.py")
+# `postconditions.py` n'en fait plus partie : les deux workflows n'y avaient
+# qu'une classe vide, et ce qu'un workflow doit avoir obtenu se dit maintenant
+# dans le champ `obtained` de son blueprint — absent quand il n'y a rien.
+ROOT_MODULES = ("workflow.py", "settings.py", "preconditions.py")
 
 # Les sous-dossiers qu'un workflow a le droit de porter, et ce que chacun
 # veut dire. Nommes plutot que libres : `glob("*.py")` ne regarde pas dans

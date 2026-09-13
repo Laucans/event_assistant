@@ -292,29 +292,32 @@ def run_dir(tmp_path, monkeypatch):
     d'une fin de run en code de sortie, et une porte qui interrogerait le vrai
     `gh` ferait echouer le run avant d'y arriver.
     """
-    from pipeline.workflows.agentic_dev_loop import preconditions
+    from pipeline.core.design import build
 
     ws = Workspace(tmp_path)
     monkeypatch.setattr(loop, "Workspace",
                         types.SimpleNamespace(here=lambda: ws))
     monkeypatch.setattr(loop, "notify", lambda msg: None)
-    monkeypatch.setattr(preconditions.LoopPreconditions, "verify",
-                        lambda self: Result.of(None))
+    monkeypatch.setattr(build.Gates, "verify", lambda self: Result.of(None))
     return ws
 
 
 def raise_in_loop(monkeypatch, exc):
     """Le workflow explose vraiment — le chemin du crash inattendu."""
-    async def boom(cfg, log, log_dir):
+    from pipeline.core.design import build
+
+    async def boom(self):
         raise exc
-    monkeypatch.setattr(workflow_loop, "run_rounds", boom)
+    monkeypatch.setattr(build.Built, "execute", boom)
 
 
 def stop_in_loop(monkeypatch, outcome):
     """Le workflow s'arrete proprement, et rend pourquoi."""
-    async def stops(cfg, log, log_dir):
+    from pipeline.core.design import build
+
+    async def stops(self):
         return outcome
-    monkeypatch.setattr(workflow_loop, "run_rounds", stops)
+    monkeypatch.setattr(build.Built, "execute", stops)
 
 
 def only_run_log(run_dir):

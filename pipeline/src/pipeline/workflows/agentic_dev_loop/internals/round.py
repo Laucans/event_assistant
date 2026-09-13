@@ -81,7 +81,7 @@ def _scope(st: RoundState) -> str:
         title=st.task_title, body=st.task_body, injector=INJECTOR)
 
 
-def _extra(stage, st: RoundState) -> str:
+def _extra(stage, ctx: RoundCtx, st: RoundState) -> str:
     """Les consignes de ce stage, plus la portee du round.
 
     Les consignes viennent de l'entree de table, pas d'un registre indexe par
@@ -175,7 +175,7 @@ async def run(ctx: RoundCtx, st: RoundState, *,
     ran = await run_sequence(
         cfg.pipeline, ctx=ctx, state=st,
         run=lambda step: runner.run(step, done=st.stages_done,
-                                    extra=_extra(step, st)),
+                                    extra=_extra(step, ctx, st)),
         log=ctx.log, excluded=runner.filtered, save=save)
     if ran.failed:
         return ran

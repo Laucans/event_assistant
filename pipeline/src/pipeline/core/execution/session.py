@@ -19,7 +19,6 @@ from pathlib import Path
 from pipeline.core.adapters.agent import AgentRunner, default_runner
 from pipeline.core.adapters.agent import progress
 from pipeline.core.adapters.store import envelope
-from pipeline.core.adapters.store import ledger
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.domain.outcomes.stage_result import StageResult, read_markers
 from pipeline.core.domain.stage_spec import StageSpec
@@ -44,10 +43,10 @@ class Artifacts:
     trace: Path
 
     @classmethod
-    def of(cls, log_dir: Path, round_no: int, skill: str) -> "Artifacts":
-        # Le numero de round, zero-padde, nomme les artefacts de ce stage — la
-        # meme valeur que le registre ecrit dans sa colonne `round`.
-        tag = f"{round_no:02d}"
+    def of(cls, log_dir: Path, tag: str, skill: str) -> "Artifacts":
+        # Ce que le tag vaut est la politique du workflow : le round y met son
+        # numero zero-padde — la meme valeur que la colonne `round` du
+        # registre —, la revue le numero de sa PR.
         return cls(log_dir / f"{tag}-{skill}.log",
                    log_dir / f"{tag}-{skill}.json",
                    log_dir / f"{tag}-{skill}.trace.log")
@@ -81,13 +80,8 @@ def _keep(files: Artifacts, result, cfg: StagePolicy, *, round_no: int,
     """
     envelope.write(files.envelope, result.raw, ENVELOPE)
     files.log.write_text(result.text + "\n", encoding="utf-8")
-    ledger.append(
-        cfg.workspace.ledger, run_id=cfg.run_id, round_no=round_no, task=task,
-        stage=stage.skill,
-        cache_read=result.usage.get("cache_read_input_tokens"),
-        cache_write=result.usage.get("cache_creation_input_tokens"),
-        outcome=reason or "ok",
-        **result.ledger_fields(model=stage.model, effort=stage.effort))
+    cfg.record(stage, result, round_no=round_no, task=task,
+               outcome=reason or "ok")
 
 
 def _marker_lines(log: Logbook, skill: str, text: str) -> tuple[str | None, str | None]:
@@ -119,7 +113,8 @@ async def run(stage: StageSpec, cfg: StagePolicy, *, round_no: int, task: str,
     ne porte rien, pas un echec.
     """
     prompt = cfg.prompt_for(stage, extra)
-    files = Artifacts.of(log_dir, round_no, stage.skill)
+    files = Artifacts.of(log_dir, cfg.artifact_tag(round_no),
+                         stage.skill)
 
     if cfg.dry_run:
         files.log.write_text(prompt + "\n", encoding="utf-8")

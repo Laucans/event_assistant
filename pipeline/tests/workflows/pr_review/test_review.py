@@ -28,7 +28,8 @@ from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook
 from pipeline.core.adapters.shell import binaries
 from pipeline.core.adapters import hub as adapters
-from pipeline.workflows.pr_review.internals import passes as passes_mod
+from pipeline.core.adapters.agent.base import AgentResult
+from pipeline.core.execution import session as session_mod
 
 
 def test_brief_prompt_still_matches_the_shell_to_the_byte():
@@ -143,19 +144,46 @@ def rev(ws, monkeypatch):
     return fake
 
 
+def answered(text, why):
+    """Ce qu'une passe rend, dans le vocabulaire neutre d'une session.
+
+    La raison n'est plus dite par le double : elle se **derive** de ce que le
+    fournisseur a rendu, comme en vrai — c'est `failure_reason` qui tranche,
+    et le scenario n'a plus le droit de mentir sur ce point.
+    """
+    if why == "quota":
+        return AgentResult(text="", is_error=True, subtype="error",
+                           api_error_status=429, session_id="sess-q")
+    if why == "failed":
+        return AgentResult(text="", is_error=True, subtype="error_max_turns",
+                           session_id="sess-f")
+    if why == "empty" or text is None:
+        return AgentResult(text="", session_id="sess-e")
+    return AgentResult(text=text, session_id="sess-1", cost_usd=0.5,
+                       duration_ms=1000, turns=2,
+                       usage={"input_tokens": 10, "output_tokens": 20},
+                       raw={"result": text})
+
+
 @pytest.fixture
 def passes(monkeypatch):
-    """The two paid passes, replaced by a scriptable recorder."""
+    """Les deux passes payantes, remplacees par un moteur scriptable.
+
+    La couture est `session.default_runner` — le seul endroit ou une session
+    se construit —, la meme que la boucle utilise. Le double dispatche sur le
+    prompt : la passe 1 ouvre sur `/code-review`, la 2 sur les notes.
+    """
     ran = []
     script = {"inline": ("DES FINDINGS", None), "brief": ("Le corps", None)}
 
-    async def fake_run(prompt, label, model, effort, num, dry_run, log,
-                       *, workspace, heartbeat_s=60.0, verbose=False,
-                       runner=None):
-        ran.append(label)
-        return script[label]
+    class Engine:
+        async def run(self, prompt, *, model, effort, permission_mode,
+                      progress=None):
+            label = "inline" if prompt.startswith("/code-review") else "brief"
+            ran.append(label)
+            return answered(*script[label])
 
-    monkeypatch.setattr(passes_mod, "run_pass", fake_run)
+    monkeypatch.setattr(session_mod, "default_runner", lambda ws: Engine())
     return types.SimpleNamespace(ran=ran, script=script)
 
 
@@ -354,12 +382,16 @@ def test_the_help_documents_every_env_var_the_review_reads(capsys):
 
 
 # --- une passe, du SDK jusqu'au registre -----------------------------------
+#
+# Le chemin entier, sans double de passe : le faux SDK repond, et la revue va
+# jusqu'au registre. C'est ce que `run_pass` testait quand elle existait ; les
+# passes sont maintenant des etapes ordinaires, donc ca se verifie en faisant
+# tourner la revue.
 
-def one_pass(ws, label="inline", dry_run=False):
-    return asyncio.run(passes_mod.run_pass("/code-review medium 12 --comment", label,
-                                   "sonnet", "medium", "12", dry_run,
-                                   logbook.null(), workspace=ws,
-                                   heartbeat_s=0))
+
+def review_rows(ws):
+    return [l.split("\t")
+            for l in ws.review_ledger.read_text(encoding="utf-8").splitlines()[1:]]
 
 
 def test_a_pass_that_answers_books_its_cost_and_keeps_its_envelope(rev, ws,
@@ -367,39 +399,50 @@ def test_a_pass_that_answers_books_its_cost_and_keeps_its_envelope(rev, ws,
     fake_sdk.answers(
         AssistantMessage([ToolUseBlock("1", "Read", {"file_path": "a.ts"})]),
         result="DES FINDINGS", total_cost_usd=0.1234)
-    assert one_pass(ws) == ("DES FINDINGS", None)
+    assert main("12") == 0
 
     envelope = json.loads(
         (ws.review_dir / "12-inline.json").read_text(encoding="utf-8"))
     assert envelope["result"] == "DES FINDINGS" and envelope["is_error"] is False
-    row = ws.review_ledger.read_text(encoding="utf-8").splitlines()[1]
-    assert row.split("\t")[1:4] == ["12", "inline", "0.123400"]
+    row = review_rows(ws)[0]
+    assert row[1:4] == ["12", "inline", "0.123400"]
+    assert row[-1] == "ok", "la colonne outcome dit ce que l'argent a achete"
     assert "Read a.ts" in (ws.review_dir / "12-inline.trace.log").read_text(
         encoding="utf-8")
 
 
-@pytest.mark.parametrize("fields, reason", [
-    ({"api_error_status": 429}, "quota"),
-    ({"is_error": True, "subtype": "error_during_execution"}, "failed"),
-    ({"result": ""}, "empty"),
+@pytest.mark.parametrize("fields, reason, code", [
+    # Un quota sur la passe 1 arrete la revue : la 2 depenserait la meme
+    # fenetre et reviendrait pareil.
+    ({"api_error_status": 429}, "quota", 3),
+    ({"is_error": True, "subtype": "error_during_execution"}, "failed", 2),
+    ({"result": ""}, "empty", 2),
 ])
-def test_a_pass_that_did_not_answer_says_which_kind_of_nothing(rev, ws,
-                                                               fake_sdk,
-                                                               fields, reason):
+def test_a_pass_that_did_not_answer_books_which_kind_of_nothing(
+        rev, ws, fake_sdk, fields, reason, code):
+    """L'argent brule par une passe coupee ne doit pas se lire comme achete."""
     fake_sdk.answers(**fields)
-    assert one_pass(ws) == (None, reason)
+    assert main("12") == code
+    assert review_rows(ws)[0][-1] == reason
+    assert not rev.posted
 
 
-def test_a_session_that_never_answered_is_its_own_reason(rev, ws, fake_sdk):
+def test_a_session_that_never_answered_stops_the_review(rev, ws, fake_sdk):
+    """Aucun resultat du tout : rien a inscrire, et rien a poster."""
     fake_sdk.says_nothing()
-    assert one_pass(ws) == (None, "no-result")
+    assert main("12") == 2
+    assert not rev.posted
 
 
-def test_a_dry_run_pass_prints_the_prompt_and_calls_nothing(rev, ws, fake_sdk,
-                                                            capsys):
-    assert one_pass(ws, dry_run=True) == (None, "dry-run")
-    assert "/code-review medium 12 --comment" in capsys.readouterr().out
+def test_a_dry_run_writes_the_prompts_and_calls_nothing(rev, ws, fake_sdk,
+                                                        capsys):
+    """Ecrits plutot qu'imprimes : le hook lance la revue detachee, et un
+    stdout que personne ne lit n'est pas un canal."""
+    assert main("12", "--dry-run") == 0
+    assert "/code-review medium 12 --comment" in (
+        ws.review_dir / "12-inline.log").read_text(encoding="utf-8")
     assert fake_sdk.prompts == []
+    assert not rev.posted
 
 
 # --- ou tourne `gh`, et sur quelle PR ---------------------------------------

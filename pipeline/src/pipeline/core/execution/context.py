@@ -40,6 +40,10 @@ class Ctx:
     log_dir: Path
     round_no: int
     tally: metrics.Tally = field(default_factory=metrics.Tally)
+    # Ce que chaque etape a rendu, par nom. Ici et pas dans l'etat persiste :
+    # une passe rend son texte a la suivante, et ce texte ne se relit pas
+    # depuis une reprise — il se repaie.
+    results: dict = field(default_factory=dict)
     # Le moteur d'agent des stages de ce round ; None laisse `session.run`
     # prendre celui par defaut.
     runner: AgentRunner | None = None
