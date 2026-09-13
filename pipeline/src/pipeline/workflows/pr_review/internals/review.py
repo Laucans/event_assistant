@@ -12,14 +12,11 @@ rend en une phrase plutot qu'en un echec.
 
 from __future__ import annotations
 
-import contextlib
-from pathlib import Path
-
 from pipeline.core.adapters import hub as adapters
 from pipeline.core.domain.outcomes.result import Result
-from pipeline.workflows.pr_review.internals.pr import Pr
-from pipeline.workflows.pr_review.internals.skip_rules import (
-    PR_FIELDS, skip_reason)
+from pipeline.core.domain.pulls import Pr
+from pipeline.core.runtime.filesystem.lock import claim
+from pipeline.workflows.pr_review.internals.skip_rules import skip_reason
 
 
 class ReviewState:
@@ -50,11 +47,11 @@ def precheck(cfg, log, state: ReviewState) -> Result[str]:
     """Y a-t-il quelque chose a revoir ? Pose la PR dans l'etat au passage."""
     gh = adapters.gh(cfg.workspace)
 
-    meta, why = gh.pr(cfg.pr, PR_FIELDS)
-    if meta is None:
+    pr, why = gh.pr(cfg.pr)
+    if pr is None:
         return _cannot(cfg, f"cannot read PR {cfg.pr} — {why}",
                        f"pr-review: cannot read PR {cfg.pr}")
-    state.pr = Pr.of(meta)
+    state.pr = pr
 
     comments = ""
     if not cfg.force:
@@ -66,36 +63,18 @@ def precheck(cfg, log, state: ReviewState) -> Result[str]:
                 f" — {why}",
                 f"pr-review: cannot read the comments of PR #{state.pr.num}")
 
-    skip = skip_reason(cfg, meta, comments)
+    skip = skip_reason(cfg, pr, comments)
     if skip:
         return Result.of(f"skip — {skip}")
-    pr = state.pr
     log(f"reviewing #{pr.num}  {pr.head} -> {pr.base}  ({pr.title})")
     return Result.of("")
 
 
-@contextlib.contextmanager
-def claim(review_dir: Path, num: str):
-    """Le verrou d'une PR. Rend False si une autre revue la tient deja.
+def one_at_a_time(cfg, state: ReviewState):
+    """Le garde de la forme : au plus une revue de cette PR a la fois.
 
     Deux hooks qui partiraient sur la meme PR posteraient la revue deux fois.
     """
-    review_dir.mkdir(parents=True, exist_ok=True)
-    lock = review_dir / f".lock-{num}"
-    try:
-        lock.mkdir()
-    except FileExistsError:
-        yield False
-        return
-    try:
-        yield True
-    finally:
-        with contextlib.suppress(OSError):
-            lock.rmdir()
-
-
-def one_at_a_time(cfg, state: ReviewState):
-    """Le garde de la forme : au plus une revue de cette PR a la fois."""
     return claim(cfg.workspace.review_dir, state.pr.num)
 
 

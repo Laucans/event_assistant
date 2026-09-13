@@ -16,8 +16,8 @@
 
 ```
 src/pipeline/
-├── core/        48 modules — vocabulaire, runtime, adaptateurs, exécution, design
-├── workflows/   34 modules — agentic_dev_loop, pr_review, common, legacy
+├── core/        50 modules — vocabulaire, runtime, adaptateurs, exécution, design
+├── workflows/   33 modules — agentic_dev_loop, pr_review, common, legacy
 └── launcher/    14 modules — routeur, 2 CLI, 4 hooks
 ```
 

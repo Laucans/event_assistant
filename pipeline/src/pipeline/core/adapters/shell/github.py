@@ -31,6 +31,7 @@ from pathlib import Path
 
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.domain.issues import Issue
+from pipeline.core.domain.pulls import Pr
 
 # Assez pour un depot d'une personne, et une raison de ne pas dependre de
 # `--paginate` : sa sortie multi-pages n'est pas un seul document JSON dans
@@ -89,6 +90,21 @@ def _issue(payload: dict) -> Issue:
                 body=payload.get("body") or "")
 
 
+# Les metadonnees dont les regles de saut ont besoin, en un appel.
+PR_FIELDS = "number,baseRefName,headRefName,title,url,state,isDraft"
+
+
+def _pr(payload: dict) -> Pr:
+    """Une PR de l'API, dans la forme que le domaine sait lire."""
+    return Pr(num=str(payload["number"]),
+              base=payload.get("baseRefName") or "",
+              head=payload.get("headRefName") or "",
+              title=payload.get("title") or "",
+              url=payload.get("url") or "",
+              state=payload.get("state") or "OPEN",
+              draft=bool(payload.get("isDraft")))
+
+
 def _merged(rows) -> list[Issue]:
     """Les PR de la liste qui ont ete mergees, dans l'ordre recu.
 
@@ -123,17 +139,17 @@ class GitHub:
 
     # --- les PR ------------------------------------------------------------
 
-    def pr(self, ref: str, fields: str):
+    def pr(self, ref: str) -> tuple[Pr | None, str]:
         """Les metadonnees d'une PR, ou None si `gh` n'a pas pu la lire.
 
         Rend `(donnees, diagnostic)` : le diagnostic est la derniere ligne
         utile de stderr, celle qu'un humain doit lire apres deux passes
         payees pour rien.
         """
-        out = self._run("pr", "view", ref, "--json", fields, check=False)
+        out = self._run("pr", "view", ref, "--json", PR_FIELDS, check=False)
         if out.returncode != 0:
             return None, last_line(out.stderr)
-        return json.loads(out.stdout), ""
+        return _pr(json.loads(out.stdout)), ""
 
     def comment_bodies(self, num: str) -> tuple[str | None, str]:
         """Le corps de tous les commentaires d'une PR, concatenes.

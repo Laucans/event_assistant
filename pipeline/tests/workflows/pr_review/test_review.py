@@ -458,13 +458,14 @@ def test_every_gh_call_names_this_repository(monkeypatch, tmp_path):
 
     def record(argv, **kwargs):
         seen.append((argv[0], kwargs.get("cwd")))
-        return subprocess.CompletedProcess(argv, 0, "{}", "")
+        return subprocess.CompletedProcess(
+            argv, 0, json.dumps({"number": 12}), "")
 
     monkeypatch.setattr(github.subprocess, "run", record)
     github.gh("pr", "view", "12", root=tmp_path)
     # Et par le constructeur, qui est la facon dont la revue et le round le
     # construisent : la racine est celle du workspace, pas un global.
-    github.GitHub(tmp_path).pr("12", "number")
+    github.GitHub(tmp_path).pr("12")
     assert seen == [("gh", str(tmp_path)), ("gh", str(tmp_path))]
 
 

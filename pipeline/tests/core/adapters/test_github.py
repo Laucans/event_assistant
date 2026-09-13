@@ -7,6 +7,7 @@ identifiant interne, que les liens exigent et qu'une implementation pressee
 confondrait.
 """
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -215,3 +216,30 @@ def test_an_unreadable_pr_list_fails_rather_than_reading_as_empty(fake, hub):
     got = hub.merged_prs("main_agent")
     assert got.status is Status.UNREADABLE
     assert got.value is None
+
+
+# --- les metadonnees d'une PR ---------------------------------------------
+
+META = {"number": 12, "baseRefName": "main_agent", "headRefName": "feat/x",
+        "title": "Un titre de PR", "url": "https://github.com/o/r/pull/12",
+        "state": "OPEN", "isDraft": False}
+
+
+def viewing(meta):
+    """`gh pr view --json ...`, en double."""
+    def run(*args, check=True):
+        return subprocess.CompletedProcess(args, 0, json.dumps(meta), "")
+    return github.GitHub(Path("/un/depot"), run=run)
+
+
+def test_a_pr_comes_back_in_the_shape_the_domain_reads():
+    pr, why = viewing(META).pr("12")
+    assert (pr.num, pr.base, pr.head) == ("12", "main_agent", "feat/x")
+    assert (pr.title, pr.url) == ("Un titre de PR", META["url"])
+    assert (pr.state, pr.draft) == ("OPEN", False)
+    assert why == ""
+
+
+def test_the_number_is_a_string_because_every_reader_wants_one():
+    """Il nomme des fichiers et part dans des commandes `gh`, jamais en int."""
+    assert viewing({**META, "number": 7}).pr("12")[0].num == "7"
