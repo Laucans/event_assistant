@@ -243,3 +243,24 @@ def test_a_pr_comes_back_in_the_shape_the_domain_reads():
 def test_the_number_is_a_string_because_every_reader_wants_one():
     """Il nomme des fichiers et part dans des commandes `gh`, jamais en int."""
     assert viewing({**META, "number": 7}).pr("12")[0].num == "7"
+
+
+def test_every_comment_of_an_issue_is_read_past_the_first_page(fake, hub):
+    """GitHub les rend du plus ancien au plus recent : la page 1 seule perd
+    le dernier `refinement round: N`, et le compteur repart en arriere."""
+    number = fake.add("Une task")
+    for n in range(150):
+        fake.comment(number, f"commentaire {n}")
+    got = hub.issue_comments(number)
+    assert len(got.value) == 150
+    assert got.value[-1] == "commentaire 149"
+
+
+def test_more_comments_than_the_pages_allow_fails_rather_than_truncating(
+        fake, hub, monkeypatch):
+    """Tronquee, une liste se lit comme une liste complete."""
+    monkeypatch.setattr(github, "MAX_PAGES", 1)
+    number = fake.add("Une task")
+    for n in range(150):
+        fake.comment(number, f"commentaire {n}")
+    assert hub.issue_comments(number).status is Status.UNREADABLE

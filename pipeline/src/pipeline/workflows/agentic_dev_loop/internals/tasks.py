@@ -39,25 +39,17 @@ from __future__ import annotations
 import re
 
 from pipeline.core.domain.issues import Issue
+from pipeline.workflows.common import labels
 
-# Les etiquettes qui portent tout le modele. Elles sont creees a la main sur
-# le depot, et `workflows.agentic_dev_loop.preconditions` verifie qu'elles
-# existent avant de payer quoi que ce soit : une etiquette mal orthographiee
-# rend le tableau vide, et un tableau vide se lit comme « plus rien a faire ».
-ROADMAP = "pipeline:roadmap"
-MILESTONE = "pipeline:milestone"
-AGENT = "pipeline:agent"
-HUMAN = "pipeline:human"
-READY = "pipeline:ready"
-SPEC_WRITTEN = "pipeline:spec-written"
-# Livree sur la branche d'integration, pas encore fusionnee dans `main`.
-# L'issue reste **ouverte** : la fermer dirait que le travail est integre,
-# ce qui n'est vrai qu'apres la fusion. Ce troisieme etat est ce qui separe
-# « l'agent a fini » de « c'est dans main ».
-WAITING_MERGE = "pipeline:waiting-merge"
+ROADMAP = labels.ROADMAP
+MILESTONE = labels.MILESTONE
+AGENT = labels.AGENT
+HUMAN = labels.HUMAN
+READY = labels.READY
+SPEC_WRITTEN = labels.SPEC_WRITTEN
+WAITING_MERGE = labels.WAITING_MERGE
 
-LABELS = (ROADMAP, MILESTONE, AGENT, HUMAN, READY, SPEC_WRITTEN,
-          WAITING_MERGE)
+LABELS = labels.LOOP
 
 
 # --- ce qu'une etiquette veut dire pour ce round ---------------------------

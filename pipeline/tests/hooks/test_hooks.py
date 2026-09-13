@@ -119,7 +119,8 @@ def test_a_path_outside_the_scratchpad_says_nothing():
 
 
 ORPHANS = [("branch-guard.py", 2), ("no-secret-paths.py", 2),
-           ("scratchpad-notice.py", 0), ("pr-review-trigger.py", 0)]
+           ("scratchpad-notice.py", 0), ("pr-review-trigger.py", 0),
+           ("refinement-trigger.py", 0)]
 
 
 @pytest.fixture

@@ -44,8 +44,8 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 - `npm run typecheck` — runs `next typegen` before `tsc --noEmit`; the app uses
   Next's generated route types (`LayoutProps<"/">`), so bare `tsc` fails.
 - `npm run format` / `npm run format:check` — Prettier.
-- `scripts/agent-loop` / `scripts/pr-review` — shims onto the Python in
-  `pipeline/`, tested separately from `npm run test`:
+- `scripts/agent-loop` / `scripts/pr-review` / `scripts/refinement <issue>` —
+  shims onto the Python in `pipeline/`, tested separately from `npm run test`:
   `pipeline/.venv/bin/python -m pytest pipeline/tests`.
 
 ## Constraints that aren't visible in the code
@@ -76,10 +76,13 @@ scraper are not wired up yet. Rationale in `docs/ARCHITECTURE.md`:
 
 - Pipeline: `docs/PROJECT.md` + `docs/ARCHITECTURE.md` → a
   `pipeline:roadmap` issue → `/planner` opens a `pipeline:milestone` issue
-  and its `pipeline:agent` sub-issues → `/business-analyst` writes the SPEC
+  and its `pipeline:agent` sub-issues → `scripts/refinement` writes the SPEC
   into a task's issue body → `/tech-analyst` plans → `/code` builds →
   `/create-test`. `/code-review` runs before any work is called done.
   Implementing a task is a normal session — `/clear` first.
+- **The SPEC comes from `scripts/refinement <issue>`, not `/business-analyst`**
+  — one round per run, gated on `pipeline:refinement`, which the human adds and
+  the round drops; it sets `pipeline:spec-written`. `--context` steers a re-run.
 - **A task is done when its issue closes**, and the only thing that closes
   one is a merged PR whose body carries `Closes #N` on its own line.
   Nothing else marks a task finished; there is no archiving step.

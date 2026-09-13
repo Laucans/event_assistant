@@ -5,8 +5,8 @@ Le framework : `../core/ARCHITECTURE.md`. Les entrées : `../launcher/ARCHITECTU
 ## Périmètre
 
 - Un workflow : une chose qu'on lance et qui dépense de l'argent.
-- Deux en place : `agentic_dev_loop/`, `pr_review/`.
-- `common/` : les portes partagées. Pas un workflow.
+- Trois en place : `agentic_dev_loop/`, `pr_review/`, `refinement/`.
+- `common/` : les portes et les étiquettes partagées. Pas un workflow.
 - `legacy/` : bascule markdown → issues, à usage unique. Pas un workflow.
 - Les deux sont exemptés par `NOT_A_WORKFLOW` dans `tests/test_layering.py`.
 
@@ -78,7 +78,7 @@ WORKFLOW = Blueprint(
 | | `Once` | `Repeat` |
 | --- | --- | --- |
 | Pour | une cible | un budget |
-| Client | `pr_review` | `agentic_dev_loop` |
+| Client | `pr_review`, `refinement` | `agentic_dev_loop` |
 | Requis | `plan`, `state` | `unit`, `budget` |
 | Optionnel | `extra`, `precheck`, `guard`, `held`, `tolerate`, `summary` | `label`, `exhausted`, `summary` |
 
@@ -168,11 +168,31 @@ binaries.shutil                             # PATH ; résolu à l'appel
 | `test_a_workflow_never_imports_another_workflow` | couplage entre workflows |
 | `test_the_common_package_never_imports_a_workflow` | portes communes captives d'un client |
 | `test_no_module_of_the_domain_names_a_workflow` | une instance rangée dans le vocabulaire |
-| `test_only_its_own_workflow_names_the_pipeline_labels` | `pipeline:` hors du workflow qui le définit |
+| `test_only_its_own_workflow_names_the_pipeline_labels` | `pipeline:` écrit sous `core/` |
 | `test_every_layer_only_imports_the_layers_below_it` | un import qui remonte |
 | `test_every_module_a_docstring_names_still_exists` | un pointeur mort |
 
 - Les workflows sont découverts, pas listés. Un troisième est vérifié sans intervention.
+
+## Les huit étiquettes
+
+`workflows/common/labels.py` — deux workflows les lisent, aucun ne les possède.
+
+```
+pipeline:roadmap        un item de roadmap, source d'un milestone
+pipeline:milestone      un milestone ; ses sous-issues sont les tasks
+pipeline:agent          une task que la boucle peut faire
+pipeline:human          une task que seul l'humain peut faire
+pipeline:ready          l'humain autorise celle-ci. Personne d'autre ne la pose
+pipeline:spec-written   le SPEC est dans le corps de l'issue
+pipeline:waiting-merge  livrée sur la branche d'intégration, pas dans main
+pipeline:refinement     cette issue attend un round de raffinage
+```
+
+- `LOOP` : les sept que la boucle exige. `pipeline:refinement` n'en est pas — la boucle ne la lit pas.
+- `agentic_dev_loop/internals/tasks.py` les réexporte sous leurs noms actuels.
+- Créées à la main. Chaque préflight vérifie les siennes avant de payer.
+- Une étiquette mal orthographiée rend le tableau vide, et vide déclenche `/planner`.
 
 ## `agentic_dev_loop`
 
@@ -191,21 +211,6 @@ binaries.shutil                             # PATH ; résolu à l'appel
 | `internals/gates.py` | ce qu'une étape exige et doit obtenir |
 | `stages/` | la table `PIPELINE`, `INJECTOR`, et un module de prose par stage |
 | `stages/business_analyst.py`, `code.py`, `planner.py` | les consignes propres à chaque stage |
-
-### Les sept étiquettes
-
-```
-pipeline:roadmap        un item de roadmap, source d'un milestone
-pipeline:milestone      un milestone ; ses sous-issues sont les tasks
-pipeline:agent          une task que la boucle peut faire
-pipeline:human          une task que seul l'humain peut faire
-pipeline:ready          l'humain autorise celle-ci. Personne d'autre ne la pose
-pipeline:spec-written   le SPEC est dans le corps de l'issue
-pipeline:waiting-merge  livrée sur la branche d'intégration, pas dans main
-```
-
-- Créées à la main. Le préflight vérifie qu'elles existent avant de payer.
-- Une étiquette mal orthographiée rend le tableau vide, et vide déclenche `/planner`.
 
 ### Les quatre règles de choix
 
@@ -266,6 +271,73 @@ CLOSES = r"^[ \t]*(?:closes|fixes|resolves)[ \t]+#(\d+)[ \t]*$"
 - Règle 3 : une revue par task, pas par PR. `/code` et `/create-test` ouvrent chacun une PR.
 - Revoir celle des tests reverrait deux fois le même changement.
 - Le texte publié reste en français : il s'adresse à un humain francophone.
+
+## `refinement`
+
+- Forme `Once`. Le routeur, les cinq sections, puis la publication.
+- Écrit le corps d'une issue, par rounds. Remplace `/business-analyst` : le SPEC que `/code` lit sort d'ici.
+- N'écrit rien dans l'arbre de travail. Ni porte de branche, ni arbre propre.
+- Verrou par issue. Journal, corps et artefacts dans `.llocal/refinement/`, registre à part.
+
+| Module | Porte |
+| --- | --- |
+| `internals/sections.py` | les cinq sections : `parse`, `render`, `missing`. Métier pur |
+| `internals/rounds.py` | le compteur, ce qu'un round écrit, la réponse du routeur. Métier pur |
+| `internals/refine.py` | `RefinementState`, pré-contrôle, garde du verrou, phrase de fin |
+| `internals/publish.py` | l'étape locale : le corps, le commentaire, les étiquettes |
+| `internals/gates.py` | section voulue, routeur éteint, sections nommées, dry-run |
+| `stages/__init__.py` | `passes(cfg)`, `prompt_of`, `additional_context` |
+| `stages/business_goal.py`, `technical.py`, `acceptance_criteria.py`, `business_rules.py`, `technical_plan.py`, `router.py` | un module de prose par stage |
+
+### Les cinq sections, et le routeur
+
+Titres markdown exacts, en anglais : ils sont écrits tels quels dans le corps.
+
+| Section | Clé | Round | Modèle | Variables |
+| --- | --- | --- | --- | --- |
+| `## Business Goal` | `business-goal` | 1 | opus / high | `REFINEMENT_GOAL_MODEL` / `_EFFORT` |
+| `## Technical` | `technical` | 1 | opus / high | `REFINEMENT_TECHNICAL_MODEL` / `_EFFORT` |
+| `## Acceptance Criteria` | `acceptance-criteria` | 1 | sonnet / high | `REFINEMENT_CRITERIA_MODEL` / `_EFFORT` |
+| `## Business Rules` | `business-rules` | 2 | opus / high | `REFINEMENT_RULES_MODEL` / `_EFFORT` |
+| `## Technical Implementation Plan` | `technical-plan` | 2 | opus / high | `REFINEMENT_PLAN_MODEL` / `_EFFORT` |
+| *(le routeur)* | `router` | ≥ 3 | sonnet / low | `REFINEMENT_ROUTER_MODEL` / `_EFFORT` |
+
+- `REFINEMENT_MODEL` force un seul modèle sur les six.
+- L'ordre du tableau **est** celui du corps, et celui des étapes.
+- Un stage qui n'a rien rendu laisse la section précédente en place. Il ne l'efface pas.
+
+### Les rounds
+
+- Le round courant : le plus grand `N` d'un commentaire `refinement round: N`, plus un.
+- Ni fichier d'état, ni étiquette. Le compteur vit là où l'humain le voit et le corrige.
+- Un round par invocation. En fin de round, le commentaire `refinement round: N`, rien d'autre.
+
+| Round | Ce qui tourne |
+| --- | --- |
+| 1 | les trois du round 1. Le corps existant est la matière, puis il est remplacé |
+| 2 | les manquantes du round 1, puis les deux du round 2 |
+| ≥ 3, sans `--context` | les cinq |
+| ≥ 3, avec `--context` | le routeur nomme celles à rouvrir |
+
+- `--context` est injecté dans chaque prompt, sous `additional_context`.
+- Un routeur qui ne nomme aucune section échoue : un round muet aurait payé pour rien.
+
+### Les quatre refus d'entrée
+
+1. L'issue est fermée.
+2. Elle ne porte ni `pipeline:agent` ni `pipeline:human` — le raffinage travaille une task.
+3. Elle ne porte pas `pipeline:refinement`.
+4. Ses commentaires ne se lisent pas.
+
+- Vérifiés avant toute session. `--force` ne lève que le troisième.
+- Refus 4 : lue comme « aucun commentaire », une lecture ratée ferait repartir le round à 1, par-dessus le travail des précédents.
+
+### Publication
+
+- Le corps est écrit sur disque **avant** d'être envoyé. Un `gh` raté ne perd pas des sections payées, et la phrase dit où elles sont.
+- `pipeline:refinement` retirée — seulement si l'issue la portait : `gh` rend 404 sur un `--force`.
+- `pipeline:spec-written` posée au round ≥ 2 pour une `pipeline:agent`, ≥ 1 pour une `pipeline:human`.
+- Une `pipeline:human` suit la même table et les mêmes rounds. Seul le round où `spec-written` tombe diffère : trois sections suffisent à un humain pour agir.
 
 ## `legacy/`
 

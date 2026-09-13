@@ -56,8 +56,8 @@ The runner injects both, so a session cannot start without its scope.
 
 ## Setup
 
-Beyond the venv (see `ARCHITECTURE.md`), the seven labels have to exist. Preflight
-refuses to run without them and prints the exact commands:
+Beyond the venv (see `ARCHITECTURE.md`), the eight labels have to exist. Preflight
+refuses to run without the ones its workflow reads, and prints the exact commands:
 
     gh label create pipeline:roadmap
     gh label create pipeline:milestone
@@ -66,6 +66,7 @@ refuses to run without them and prints the exact commands:
     gh label create pipeline:ready
     gh label create pipeline:spec-written
     gh label create pipeline:waiting-merge
+    gh label create pipeline:refinement
 
 ## Commands
 
@@ -76,6 +77,8 @@ refuses to run without them and prints the exact commands:
     scripts/agent-loop --dry-run       write the prompts, call nothing
     scripts/agent-loop migrate         one-shot: markdown docs -> issues
     scripts/pr-review <pr>             the advisory review of one PR
+    scripts/refinement <issue>         one refinement round on an issue body
+    scripts/refinement <issue> --context "..."   the round, steered by a request
 
 `--help` carries the environment overrides and the exit codes. Two tests check
 that no variable the code reads is missing from it, or from `.env.example`.

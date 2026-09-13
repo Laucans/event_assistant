@@ -4,7 +4,8 @@ La couche d'usage. Ce qu'elle lance : `../workflows/ARCHITECTURE.md`. Le framewo
 
 ## Périmètre
 
-- Deux protocoles : `cli` (un humain ou un cron) et `hook` (Claude Code).
+- Deux protocoles : `cli` (un humain ou un cron) et `hook` (un événement).
+- Un hook est appelé par Claude Code, ou par ce qui produit l'événement — `refinement-trigger` attend un daemon.
 - Un routeur commun. `argv[0]` nomme la route.
 - Aucune décision métier. Traduit des arguments en config, un `Result` en code de sortie.
 - Seule couche autorisée à importer `workflows/`.
@@ -27,7 +28,7 @@ Route("loop", "cli", "pipeline.launcher.cli.agentic_dev_loop",
 
 - `Route` écrite à la main, pas en dataclass : `dataclasses` tire `inspect`, ~7 ms par appel d'outil.
 - `DEFAULT = "loop"`. Un `argv[0]` inconnu tombe dessus sans consommer l'argument.
-- Six routes : `loop`, `pr-review`, et quatre hooks.
+- Huit routes : `loop`, `pr-review`, `refinement`, et cinq hooks.
 - La table est la liste unique. Deux tests la suivent au lieu de lister les workflows.
 
 ```
@@ -61,6 +62,7 @@ def main(argv) -> int
 - Une clé sortirait le run de l'abonnement et le mettrait sur un compte facturé.
 - La boucle pose en plus `OTEL_SDK_DISABLED=true`.
 - `cli/pr_review.py` exporte `PR_REVIEW_ACTIVE=1` vers les sessions qu'il lance.
+- `cli/refinement.py` : un round de raffinage sur une issue. `--context` porte la demande.
 
 | Code | Sens |
 | --- | --- |
@@ -106,12 +108,16 @@ def main(argv) -> int
 | `branch_guard` | PreToolUse | refuse un `git push` visant `main` |
 | `no_secret_paths` | PreToolUse | refuse un Bash qui lirait un chemin secret |
 | `pr_review_trigger` | PostToolUse | lance `scripts/pr-review` détaché sur une PR ouverte |
+| `refinement_trigger` | `pipeline:refinement` posée | lance `scripts/refinement` détaché sur l'issue |
 | `scratchpad_notice` | PreToolUse | signale un outil ayant écrit dans le scratchpad |
 
 - `branch_guard` est l'enforcement, pas un filet : `git push` est allowlisté plutôt que demandé.
 - `pr_review_trigger` lit l'URL sur le stdout de `gh pr create`.
 - Il refuse de partir si `PR_REVIEW_ACTIVE` est posé : pas de seconde revue depuis une revue.
 - La revue est lancée **détachée**. La boucle peut merger la PR avant qu'elle atterrisse.
+- `refinement_trigger` n'est dans aucun `settings.json` : rien dans une session ne le déclenche.
+- Il lit l'étiquette et le numéro d'un événement `issues.labeled`, forme GitHub ou forme plate.
+- Il écrit `pipeline:refinement` en clair : un hook ne peut pas importer `workflows/`.
 
 ## Shims
 
@@ -119,7 +125,7 @@ def main(argv) -> int
 exec "$py" -m "pipeline.launcher" loop "$@"
 ```
 
-- `scripts/agent-loop`, `scripts/pr-review`. Dernière ligne identique au nom de route près.
+- `scripts/agent-loop`, `scripts/pr-review`, `scripts/refinement`. Dernière ligne identique au nom de route près.
 - Le shim résout le python du venv. Rien d'autre.
 
 ## Brancher une commande
@@ -135,7 +141,7 @@ exec "$py" -m "pipeline.launcher" loop "$@"
 | --- | --- |
 | `test_the_launcher_entry_points_import_only_the_standard_library` | un hook qui charge le paquet |
 | `test_the_stdlib_only_scan_covers_the_router_and_every_hook` | un scan devenu vide |
-| `test_the_table_names_the_two_commands_and_the_four_hooks` | une route apparue sans qu'on le dise |
+| `test_the_table_names_the_three_commands_and_the_five_hooks` | une route apparue sans qu'on le dise |
 | `test_every_environment_variable_the_code_reads_is_in_a_help_epilog` | un bouton que personne ne peut trouver |
 | `test_every_environment_variable_the_code_reads_is_in_env_example` | une variable absente du fichier committé |
 

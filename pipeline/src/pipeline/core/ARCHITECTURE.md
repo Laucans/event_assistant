@@ -84,7 +84,7 @@ AGENT_LOOP_STOP:  la session s'arrête d'elle-même
 | `monitoring/logbook.py` | `Logbook`, `open_logbook`, `null` |
 | `monitoring/metrics.py` | `Tally`, `stage_line`, ratios de cache |
 
-- `Workspace` : `loop_dir`, `state`, `ledger`, `flow_db`, `review_dir`, `review_ledger`, `skills`, `ci_workflow`, `rel()`.
+- `Workspace` : `loop_dir`, `state`, `ledger`, `flow_db`, `review_dir`, `review_ledger`, `refinement_dir`, `refinement_ledger`, `skills`, `ci_workflow`, `rel()`.
 - `paths` n'est nommé que par `runtime/filesystem/`. La racine se reçoit, elle ne se lit pas.
 - Niveaux : `VERBOSE`, `NORMAL`, `QUIET`. Le fichier garde toujours DEBUG.
 - `log.bind("r3", "code")` estampille les lignes. Rend des journaux entrelacés attribuables.
@@ -123,11 +123,12 @@ hub.repo(cfg.workspace)    # git
 | --- | --- |
 | `binaries.py` | `installed()`. `shutil` résolu à l'appel, pour la couture de test |
 | `git.py` | `Git` : branche, sha, arbre sale, existence de branche |
-| `github.py` | `GitHub` : issues, sous-issues, bloqueurs, PR, étiquettes |
+| `github.py` | `GitHub` : issues, leurs commentaires, sous-issues, bloqueurs, PR, étiquettes |
 | `notify.py` | `notify()` via osascript. Ce qu'un humain absent verra |
 
 - Lectures qui décident : rendent `Result`.
-- `pr`, `comment_bodies`, `post_comment` : rendent `(valeur, pourquoi)`.
+- `pr`, `comment_bodies`, `post_comment` : rendent `(valeur, pourquoi)`. Les PR seulement.
+- `issue_comments`, `post_issue_comment` : le même geste sur une issue, en `Result`.
 - `PR_FIELDS` : les champs demandés à `gh pr view`. Désérialisés en `Pr`.
 - L'adaptateur ne décide de rien. Il ne sait pas ce qu'une étiquette signifie.
 

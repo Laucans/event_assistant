@@ -27,6 +27,14 @@ MIGRATE_UNUSED = (("--rounds", "rounds", None), ("--stages", "stages", None),
 REVIEW_EFFORTS = (("PR_REVIEW_INLINE_EFFORT", "inline_effort"),
                   ("PR_REVIEW_BRIEF_EFFORT", "brief_effort"))
 
+# Les six stages du raffinage, et la variable qui regle l'effort de chacun.
+REFINEMENT_EFFORTS = (("REFINEMENT_GOAL_EFFORT", "goal_effort"),
+                      ("REFINEMENT_TECHNICAL_EFFORT", "technical_effort"),
+                      ("REFINEMENT_CRITERIA_EFFORT", "criteria_effort"),
+                      ("REFINEMENT_RULES_EFFORT", "rules_effort"),
+                      ("REFINEMENT_PLAN_EFFORT", "plan_effort"),
+                      ("REFINEMENT_ROUTER_EFFORT", "router_effort"))
+
 EFFORTS = "|".join(stage_spec.EFFORTS)
 
 
@@ -77,6 +85,15 @@ def _review_efforts_known(cfg: object, args: argparse.Namespace) -> list[str]:
             and effort not in stage_spec.EFFORTS]
 
 
+def _refinement_efforts_known(cfg: object,
+                              args: argparse.Namespace) -> list[str]:
+    return [f"{variable}: {effort!r} is not an effort level"
+            f" — known levels: {EFFORTS}"
+            for variable, attribute in REFINEMENT_EFFORTS
+            if (effort := getattr(cfg, attribute, None))
+            and effort not in stage_spec.EFFORTS]
+
+
 def _verbose_xor_quiet(cfg: object, args: argparse.Namespace) -> list[str]:
     if not (getattr(cfg, "verbose", False) and getattr(cfg, "quiet", False)):
         return []
@@ -123,6 +140,7 @@ ERRORS: tuple[tuple[str, Check], ...] = (
     ("effort-known", _effort_known),
     ("level-known", _level_known),
     ("review-efforts-known", _review_efforts_known),
+    ("refinement-efforts-known", _refinement_efforts_known),
     ("verbose-xor-quiet", _verbose_xor_quiet),
     ("heartbeat-positive", _heartbeat_positive),
 )

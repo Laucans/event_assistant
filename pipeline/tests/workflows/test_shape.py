@@ -29,6 +29,7 @@ from test_layering import workflow_packages
 CONFIGS = {
     "agentic_dev_loop": lambda cls: cls(),
     "pr_review": lambda cls: cls(pr="12", base="main_agent"),
+    "refinement": lambda cls: cls(issue=25),
 }
 
 

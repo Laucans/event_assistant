@@ -20,9 +20,12 @@ from __future__ import annotations
 import json
 import subprocess
 
-from pipeline.workflows.agentic_dev_loop.internals.tasks import LABELS
+from pipeline.workflows.common import labels
 
 REPO = "o/r"
+
+# Les huit que le depot porte : les sept de la boucle, et celle du raffinage.
+LABELS = labels.LOOP + (labels.REFINEMENT,)
 
 
 class Unknown(AssertionError):
@@ -39,6 +42,7 @@ class FakeGitHub:
         self.issues: dict[int, dict] = {}
         self.pulls: list[dict] = []
         self.subs: dict[int, list[int]] = {}
+        self.comments: dict[int, list[str]] = {}
         self.blocked: dict[int, list[int]] = {}
         self.calls: list[tuple] = []
         # Le chemin d'API qui doit echouer : c'est ainsi qu'on exerce la
@@ -80,6 +84,9 @@ class FakeGitHub:
 
     def block(self, number: int, blocker: int) -> None:
         self.blocked.setdefault(number, []).append(blocker)
+
+    def comment(self, number: int, body: str) -> None:
+        self.comments.setdefault(number, []).append(body)
 
     def close(self, number: int) -> None:
         self.issues[number]["state"] = "closed"
@@ -156,6 +163,16 @@ class FakeGitHub:
                 self.link(number, self._by_id(int(fields["sub_issue_id"])))
                 return issue
             return [self.issues[n] for n in self.subs.get(number, [])]
+        if tail == ["comments"]:
+            if method == "POST":
+                self.comments.setdefault(number, []).append(fields.get("body", ""))
+                return {"id": 1, "body": fields.get("body", "")}
+            # Pagine comme GitHub : sans ca, une lecture qui ne demanderait
+            # que la premiere page passerait ici pour complete.
+            size = int(fields.get("per_page", 100))
+            start = (int(fields.get("page", 1)) - 1) * size
+            bodies = self.comments.get(number, [])[start:start + size]
+            return [{"body": b} for b in bodies]
         if tail == ["dependencies", "blocked_by"]:
             if method == "POST":
                 self.block(number, self._by_id(int(fields["issue_id"])))
