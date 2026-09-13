@@ -50,7 +50,7 @@ after = workflow.postconditions.verify(outcome)
 ```
 
 Deux garanties en découlent, et elles sont testées
-(`tests/workflows/common/test_contract.py`) :
+(`tests/core/execution/test_contract.py`) :
 
 - **une précondition qui échoue n'atteint jamais `execute()`** — c'est toute
   la raison d'être du préflight : ne rien dépenser pour rien ;

@@ -1,7 +1,7 @@
 """Faire tourner un stage dans un round : filtrer, marquer, compter, arreter.
 
 C'est l'orchestration, separee du design du round
-(`workflows.agentic_dev_loop.flow`) parce qu'on ne les relit pas pour les
+(`workflows.agentic_dev_loop.stages`) parce qu'on ne les relit pas pour les
 memes raisons : le round se lit pour comprendre le pipeline, ce fichier se lit
 pour comprendre une panne — pourquoi un stage a ete saute, pourquoi il a ete
 rejoue, pourquoi la boucle s'est arretee la.

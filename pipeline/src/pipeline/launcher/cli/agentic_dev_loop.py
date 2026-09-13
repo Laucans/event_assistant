@@ -51,7 +51,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="agent-loop",
         description="Run the docs pipeline unattended: one Claude Code session"
-                    " per stage, the sequence expressed as a CrewAI Flow.",
+                    " per stage, the sequence declared in"
+                    " workflows/agentic_dev_loop/stages/.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="COMMAND — omit it to run the loop:\n"
                "  migrate   turn docs/ROADMAP.md and docs/current/ into GitHub\n"
@@ -62,8 +63,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                "\n"
                "Env overrides: INTEGRATION_BRANCH, PERMISSION_MODE, MAX_ROUNDS,\n"
                "STAGES, MODEL, EFFORT, ALLOW_DIRTY, HEARTBEAT_SECONDS.\n"
-
-               "back in the journal, for debugging the graph itself.\n"
                "The PR review has knobs of its own: scripts/pr-review --help.\n"
                "\n"
                "Exit codes — an outer scheduler reads these:\n"

@@ -31,6 +31,7 @@ une couche haute est le premier pas vers un cycle.
 
 import ast
 import pathlib
+import re
 import sys
 
 import pytest
@@ -273,6 +274,82 @@ def test_the_scan_actually_reads_the_package():
     assert any(imports(p) for p in files)
     # et la regle de confinement porte bien sur du code qui existe
     assert (SRC / "core/adapters/agent/claude_sdk.py").exists()
+
+
+# --- ce qu'un docstring promet existe encore -------------------------------
+#
+# Le moteur de graphe est parti, ses docstrings sont restees : `flow.py`,
+# `adapters/engine/`, `workflows.pr_review.flow`. Un pointeur mort ne fait
+# echouer aucun test — il envoie juste le lecteur suivant dans le vide.
+
+# Ils existent, mais pas dans le paquet : rien de ce test ne les juge.
+OUTSIDE = ("docs/", ".claude/", "scripts/", ".github/", ".llocal/", "tests/",
+           "src/", "pipeline/")
+
+# `.py` ou `/` final : sans l'un des deux, un mot entre backticks n'est pas
+# distinguable d'un module.
+BACKTICK = re.compile(r"`([^`\n]+)`")
+
+# Seules les racines du paquet : `adapters.agent.default_runner` nomme une
+# fonction, pas un module.
+DOTTED = re.compile(r"^(?:pipeline|core|workflows|launcher)(?:\.[a-z_][a-z0-9_]*)+$")
+
+
+def docstrings(path: pathlib.Path) -> list[str]:
+    """Celui du module, et ceux de ses classes et de ses fonctions."""
+    found = []
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), str(path))):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                             ast.AsyncFunctionDef)):
+            text = ast.get_docstring(node, clean=False)
+            if text:
+                found.append(text)
+    return found
+
+
+def cited_modules() -> list[tuple[str, str]]:
+    """(le fichier qui cite, le chemin cite), pour tout le paquet."""
+    found: dict[tuple[str, str], None] = {}
+    for path in modules():
+        here = path.relative_to(SRC).as_posix()
+        for text in docstrings(path):
+            for raw in BACKTICK.findall(text):
+                token = raw.strip()
+                if (not token or " " in token or "<" in token
+                        or token.startswith(OUTSIDE)):
+                    continue
+                if token.endswith(".py") or token.endswith("/"):
+                    found[(here, token.rstrip("/"))] = None
+                elif DOTTED.match(token):
+                    found[(here, token.removeprefix("pipeline.")
+                           .replace(".", "/"))] = None
+    return sorted(found)
+
+
+def test_every_module_a_docstring_names_still_exists():
+    """Un pointeur mort n'echoue nulle part ; il fait perdre une demi-heure.
+
+    Depuis la racine du paquet, puis n'importe ou dedans : les docstrings
+    ecrivent `core/execution/steps.py` aussi bien que `internals/tasks.py`,
+    et les deux nomment un module qui existe.
+    """
+    entries = {p.relative_to(SRC).as_posix() for p in SRC.rglob("*")
+               if "__pycache__" not in p.parts}
+
+    def resolves(rel: str) -> bool:
+        return any(name in entries or any(e.endswith("/" + name) for e in entries)
+                   for name in (rel, rel + ".py"))
+
+    faults = [f"{here} -> {rel}" for here, rel in cited_modules()
+              if not resolves(rel)]
+    assert not faults, "docstring qui nomme un module disparu : %s" % faults
+
+
+def test_the_docstring_scan_actually_finds_the_pointers():
+    """Un scan qui ne trouve rien passerait sur tous les pointeurs morts."""
+    cited = cited_modules()
+    assert len(cited) > 20, cited
+    assert ("workflows/common/__init__.py", "core/adapters/hub.py") in set(cited)
 
 
 # --- la forme d'un workflow ------------------------------------------------
