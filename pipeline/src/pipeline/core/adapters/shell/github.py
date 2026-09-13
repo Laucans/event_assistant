@@ -39,6 +39,10 @@ from pipeline.core.domain.pulls import Pr
 # tableau vide — c'est-a-dire « plus rien a faire ».
 PER_PAGE = "100"
 
+# Le plafond de ce qui se pagine. Au-dela, la lecture echoue plutot que de
+# rendre une liste tronquee : tronquee, elle se lit comme une liste complete.
+MAX_PAGES = 10
+
 
 def gh(*args: str, root: Path,
        check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -240,6 +244,30 @@ class GitHub:
         ).map(lambda rows: [_issue(r) for r in rows or []
                             if "pull_request" not in r])
 
+    def issue_comments(self, number: int) -> Result[list[str]]:
+        """Le corps de chaque commentaire de cette issue, du plus ancien au
+        plus recent.
+
+        Pagine, a la difference des autres lectures : GitHub rend les
+        commentaires du plus ancien au plus recent, donc une premiere page
+        seule perd les derniers — et un compteur de round lu sur une liste
+        tronquee repart en arriere, par-dessus du travail deja paye.
+        """
+        bodies: list[str] = []
+        for page in range(1, MAX_PAGES + 1):
+            got = self._read(f"the comments of issue #{number}",
+                             f"issues/{number}/comments", "-X", "GET",
+                             "-f", f"per_page={PER_PAGE}", "-f", f"page={page}")
+            if got.failed:
+                return got.recast()
+            rows = got.value or []
+            bodies += [r.get("body") or "" for r in rows]
+            if len(rows) < int(PER_PAGE):
+                return Result.of(bodies)
+        return unreadable(
+            f"the comments of issue #{number}",
+            f"more than {MAX_PAGES * int(PER_PAGE)} comments")
+
     def sub_issues(self, number: int) -> Result[list[Issue]]:
         return self._read(f"the sub-issues of #{number}",
                           f"issues/{number}/sub_issues",
@@ -346,6 +374,11 @@ class GitHub:
     def set_body(self, number: int, body: str) -> Result[None]:
         return self._write(f"rewrite the body of #{number}", "PATCH",
                            f"issues/{number}", "-f", f"body={body}")
+
+    def post_issue_comment(self, number: int, body: str) -> Result[None]:
+        """Poste un commentaire sur une issue."""
+        return self._write(f"comment on #{number}", "POST",
+                           f"issues/{number}/comments", "-f", f"body={body}")
 
     def add_label(self, number: int, label: str) -> Result[None]:
         return self._write(f"label #{number} {label}", "POST",

@@ -53,12 +53,12 @@ def test_every_route_has_a_unique_name_and_a_known_protocol():
     assert {route.protocol for route in routes.ROUTES} == {"cli", "hook"}
 
 
-def test_the_table_names_the_two_commands_and_the_four_hooks():
+def test_the_table_names_the_three_commands_and_the_five_hooks():
     assert [r.name for r in routes.ROUTES if r.protocol == "cli"] == [
-        "loop", "pr-review"]
+        "loop", "pr-review", "refinement"]
     assert [r.name for r in routes.ROUTES if r.protocol == "hook"] == [
         "branch-guard", "no-secret-paths", "pr-review-trigger",
-        "scratchpad-notice"]
+        "refinement-trigger", "scratchpad-notice"]
 
 
 def test_migrate_is_not_a_route():

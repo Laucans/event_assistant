@@ -44,6 +44,14 @@ class Workspace:
         return self.root / ".llocal/pr-review/costs.tsv"
 
     @property
+    def refinement_dir(self) -> Path:
+        return self.root / ".llocal/refinement"
+
+    @property
+    def refinement_ledger(self) -> Path:
+        return self.root / ".llocal/refinement/costs.tsv"
+
+    @property
     def skills(self) -> Path:
         return self.root / ".claude/skills"
 

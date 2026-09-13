@@ -283,6 +283,7 @@ def test_the_stdlib_only_scan_covers_the_router_and_every_hook():
         "launcher/hooks/__init__.py", "launcher/hooks/branch_guard.py",
         "launcher/hooks/no_secret_paths.py",
         "launcher/hooks/pr_review_trigger.py",
+        "launcher/hooks/refinement_trigger.py",
         "launcher/hooks/scratchpad_notice.py"]
 
 
