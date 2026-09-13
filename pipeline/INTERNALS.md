@@ -163,7 +163,6 @@ de `create-test`, qui travaille contre un spec déjà écrit.
 | `agent/base.py` | `AgentRunner` (l'interface) et `AgentResult` (le résultat neutre) |
 | `agent/claude_sdk.py` | `ClaudeSdkRunner` — **le seul importeur de `claude-agent-sdk`** |
 | `agent/progress.py` | le flux du SDK rendu lisible : battement, trace par stage, recensement |
-| `engine/crewai_engine.py` | **le seul importeur de crewai** : primitives de graphe, panneaux, persistance |
 | `shell/git.py`, `shell/github.py`, `shell/notify.py` | `git`, `gh`, `osascript` |
 | `store/ledger.py` | `costs.tsv`, même format qu'avant — écrit et relu, pas mis en forme |
 | `store/resume.py` | le point de reprise : pointeur lisible + lecture sqlite du magasin |
@@ -208,7 +207,7 @@ un workflow qui en importe un autre, les fait échouer.
 
 | Interne à un workflow | Rôle |
 | --- | --- |
-| `agentic_dev_loop/internals/flow.py` | **le design** du round : la séquence, nœud par nœud |
+| `agentic_dev_loop/internals/round.py` | ce qui entoure la séquence : choisir la task, le rollover, la livraison |
 | `agentic_dev_loop/internals/gates.py` | ce qu'un **nœud** exige avant de payer, et doit avoir obtenu après |
 | `agentic_dev_loop/internals/board.py` | le côté lecture du tableau d'issues : le milestone, ses tasks |
 | `agentic_dev_loop/internals/loop.py` | la boucle sur les rounds |
@@ -219,7 +218,7 @@ un workflow qui en importe un autre, les fait échouer.
 | `pr_review/internals/skip_rules.py` | les quatre règles qui décident qu'une PR n'a pas à être revue |
 | `legacy/migrate.py` | la bascule du markdown vers les issues, une fois. **N'est pas un workflow** : elle meurt entière, et le scan de forme l'exempte explicitement |
 
-On relit `internals/flow.py` pour comprendre le pipeline,
+On relit `stages/` pour comprendre le pipeline,
 `core/execution/stage_runner.py` pour comprendre une panne. C'est pour ça qu'ils
 sont séparés.
 
@@ -337,12 +336,17 @@ Avertissements, le run continue :
 
 Trois règles, et chacune a coûté quelque chose.
 
-`crewai` coûte ~1,3 s d'import à chaud et tire `chromadb`, `openai` et
-`opentelemetry` — 2331 modules. Il n'existe donc que dans
-`core/adapters/engine/crewai_engine.py`, chargé sur le seul chemin d'un run réel.
+Le SDK d'agent est lourd à importer, et il n'existe donc que dans
+`core/adapters/agent/claude_sdk.py`, chargé sur le seul chemin d'un run réel.
 
-- `--status` et `--costs` répondent en ~0,08 s, sans crewai ni SDK. Deux
-  tests le vérifient : `test_the_fast_paths_never_import_crewai_or_the_sdk`
+crewai l'était plus encore — 1,6 s, `chromadb`, `openai`, `opentelemetry`,
+2331 modules — et c'est ce qui dictait l'essentiel des imports tardifs de ce
+paquet. Le round était un graphe ; il n'avait qu'une branche. La séquence se
+déclare maintenant dans `stages/` et `core/execution/steps.py` la fait
+tourner : le round complet s'importe en 0,10 s et 300 modules.
+
+- `--status` et `--costs` répondent en ~0,08 s, sans le SDK. Deux
+  tests le vérifient : `test_the_fast_paths_never_import_the_sdk`
   exécute vraiment la commande, `test_layering.py` interdit l'import.
 - Les **hooks** tournent sous le python du système, hors du venv, à chaque
   appel d'outil. Bibliothèque standard uniquement, pour eux comme pour le
@@ -362,13 +366,13 @@ Trois règles, et chacune a coûté quelque chose.
   ce qui le garde testable sans le SDK et le laisse survivre à un type de
   message ajouté.
 
-### La lecture du magasin de reprise, et pourquoi elle est là où elle est
+### Le magasin de reprise
 
-crewai **écrit** `flow_states` via son `@persist`, mais c'est
-`core/adapters/store/resume.py` qui le **relit**, en sqlite3 standard. Le schéma
-est donc connu des deux côtés, et c'est assumé : `--status` doit répondre
-sans payer l'import du moteur. C'est le seul couplage de ce genre dans le
-paquet, et il est nommé dans la docstring du module.
+`core/adapters/store/resume.py` **écrit et relit** `flow_states`, en sqlite3
+standard. Les deux bouts sont à nous : le `@persist` d'un moteur de graphe
+écrivait cette table et ce module la relisait, un schéma connu des deux côtés
+dont un seul était le nôtre. Les colonnes sont restées identiques, donc un
+magasin écrit avant ce changement se relit sans rien migrer.
 
 ### Pourquoi le stage `code` ouvre sur `/tech-analyst`
 
@@ -498,7 +502,7 @@ produire ou poster ses notes, `3` quand la fenêtre d'abonnement est épuisée,
 qui ne va pas dans son log ne va nulle part.
 
 Le 4 est celui qui manquait. Le `main` de la boucle n'attrapait que `Halt` et
-`KeyboardInterrupt` : une `ValidationError` pydantic, un interne crewai, une
+`KeyboardInterrupt` : une `ValidationError` pydantic, un interne du SDK, une
 erreur sqlite ou une `OSError` s'échappaient en trace sur stderr et
 n'atteignaient jamais `run.log`. Pour une boucle non surveillée c'était le pire
 cas — on revient, le terminal est fermé, et le journal s'arrête au milieu d'un

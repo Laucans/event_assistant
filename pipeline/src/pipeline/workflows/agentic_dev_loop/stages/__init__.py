@@ -1,8 +1,18 @@
-"""La table du round : un stage par entree, avec son modele et son texte.
+"""Le round : la sequence, et tout ce qu'on sait de chaque etape.
 
-**La surface de design du workflow.** Ajouter une entree met un skill dans le
-round, en retirer une l'en sort. C'est le fichier qu'on ouvre pour changer ce
-que la boucle fait — comme l'etait le tableau PIPELINE du shell.
+**La surface de design du workflow, et la seule.** L'ordre des entrees *est*
+l'ordre d'execution — `run_sequence` parcourt cette table, donc en reordonner
+deux lignes reordonne le round. Ajouter une entree ajoute une etape, en
+retirer une la retire.
+
+Ca n'a pas toujours ete vrai. La sequence a vecu dans les decorateurs
+`@listen` d'un graphe, et cette table n'etait qu'un annuaire de reglages
+indexe par nom de skill : on pouvait l'inverser entierement sans que le round
+change d'un iota, et le test qui verifiait l'ordre d'execution passait quand
+meme. Une entree porte maintenant les quatre choses qu'on veut savoir d'une
+etape sans ouvrir un autre fichier — **qui la fait tourner** (modele, effort),
+**ce qu'elle dit** (les consignes), **ce qui la fait sauter**, et **ce qu'elle
+exige et doit obtenir**.
 
 Ici et pas dans `domain/` : `domain/stage_spec.py` dit ce qu'un stage *est*,
 ce dossier dit quels stages *ce workflow-ci* fait tourner. Le vocabulaire est
@@ -29,6 +39,7 @@ Metier pur : ce module ne lit ni l'environnement, ni le disque, ni git.
 from __future__ import annotations
 
 from pipeline.core.domain.stage_spec import StageSpec
+from pipeline.workflows.agentic_dev_loop.internals import gates
 from pipeline.workflows.agentic_dev_loop.stages.business_analyst import (
     BUSINESS_ANALYST)
 from pipeline.workflows.agentic_dev_loop.stages.code import CODE
@@ -42,17 +53,39 @@ INJECTOR = "pipeline/launcher/cli/agentic_dev_loop.py"
 
 
 PIPELINE: tuple[StageSpec, ...] = (
-    StageSpec("business-analyst", "opus", "high",
-              instructions=BUSINESS_ANALYST),
-    StageSpec("code", "opus", "high", lead="/tech-analyst",
-              instructions=CODE),
-    # /create-test n'a pas de consignes propres : il travaille contre un spec
-    # deja ecrit, et le preambule plus la portee lui suffisent.
+    StageSpec(
+        "business-analyst", "opus", "high",
+        instructions=BUSINESS_ANALYST,
+        # Deja ecrit : un run interrompu reprend apres, il ne repaie pas une
+        # seconde redaction par-dessus la premiere.
+        skip=gates.spec_already_written,
+        # Le corps de l'issue *est* le SPEC. Relu, pas suppose.
+        after=gates.spec_is_in_the_issue,
+    ),
+    StageSpec(
+        "code", "opus", "high", lead="/tech-analyst",
+        instructions=CODE,
+        skip=gates.code_already_delivered,
+        before=gates.code_has_a_spec,
+    ),
+    # /create-test n'a ni consignes propres ni gardes : il travaille contre un
+    # spec deja ecrit, le preambule et la portee lui suffisent, et rien de ce
+    # qu'il produit ne conditionne la suite — c'est la derniere etape.
     StageSpec("create-test", "sonnet", "high"),
 )
 
-# L'entree que le rollover ferait tourner, prete mais pas branchee.
-PLANNER_STAGE = StageSpec("planner", "opus", "high", instructions=PLANNER)
+# La post-condition du round, apres la sequence : la task est livree. Pas une
+# etape — elle ne paie aucune session — et pas non plus la post-condition du
+# *workflow*, qui est vide parce que ce que la boucle garantit se garantit par
+# round. C'est ce que `postconditions.py` dit en toutes lettres.
+DELIVERED = gates.task_is_delivered
+
+# L'entree que le rollover ferait tourner, prete mais pas branchee. Elle n'est
+# pas dans la sequence : le rollover est une branche, pas une etape de plus —
+# il part quand il n'y a **aucune** task, donc quand la sequence n'a rien a
+# faire.
+PLANNER_STAGE = StageSpec("planner", "opus", "high", instructions=PLANNER,
+                          after=gates.planner_opened_a_task)
 
 # `planner` ne tourne pas dans la sequence par task : il partirait une fois
 # le milestone sans aucune issue `pipeline:agent` ouverte, pour ouvrir l'item

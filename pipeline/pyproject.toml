@@ -1,11 +1,13 @@
 [project]
 name = "pipeline"
 version = "0.1.0"
-description = "The unattended docs-pipeline runner: CrewAI Flow over Claude Code sessions."
-requires-python = ">=3.13,<3.14"   # plafond impose par crewai
+description = "The unattended pipeline runner: a sequence of Claude Code sessions."
+requires-python = ">=3.13"
 dependencies = [
-    "crewai>=1.15",
     "claude-agent-sdk>=0.2.150",
+    # Le modele d'etat d'un round. Arrivait avec crewai ; declare ici depuis
+    # que le moteur de graphe est parti.
+    "pydantic>=2",
 ]
 
 [project.optional-dependencies]

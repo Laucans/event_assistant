@@ -2,8 +2,8 @@
 
 Quatre couches, et la fleche va toujours vers le bas :
 
-    execution/   faire tourner un stage — filtrer, marquer, compter, arreter
-    adapters/    l'exterieur emballe : gh, git, le SDK, crewai, le disque
+    execution/   faire tourner une sequence d'etapes, et chacune d'elles
+    adapters/    l'exterieur emballe : gh, git, le SDK, le disque
     domain/      le vocabulaire : ce qu'est un stage, une issue, un arret
     runtime/     le support transverse : chemins, journal, mesures
 

@@ -1,14 +1,16 @@
 """L'architecture, en assertions plutot qu'en convention.
 
-Un README qui dit « seul ce module importe crewai » est vrai le jour ou il
+Un README qui dit « seul ce module importe le SDK » est vrai le jour ou il
 est ecrit. Ces tests le gardent vrai : ils parcourent l'AST de chaque fichier
 du paquet et verifient qui importe quoi.
 
 Quatre regles paient leur place, et chacune a coute quelque chose :
 
-- **crewai coute ~1,3 s d'import a chaud** et tire chromadb, openai et
-  opentelemetry — 2331 modules. Un import qui remonterait sur le chemin
-  rapide ferait repondre `--status` en 2,5 s au lieu de 0,08 s ;
+- **le SDK est lourd a importer**, et un import qui remonterait sur le chemin
+  rapide ferait repondre `--status` en secondes au lieu de dizaines de
+  millisecondes. crewai etait l'autre, et pesait 1,6 s a lui seul : le round
+  etait un graphe, ce graphe n'avait qu'une branche, et le moteur est parti
+  avec lui ;
 - **les hooks tournent sous le python du systeme**, hors du venv, a chaque
   appel d'outil : un hook qui importerait le paquet rendrait la session
   inutilisable ;
@@ -69,8 +71,6 @@ STDLIB_ONLY_DIR = "launcher/hooks/"
 # Les bibliotheques qui n'ont le droit d'apparaitre qu'a un seul endroit.
 CONFINED = {
     "claude_agent_sdk": "core/adapters/agent/claude_sdk.py",
-    "crewai": "core/adapters/engine/crewai_engine.py",
-    "crewai_core": "core/adapters/engine/crewai_engine.py",
 }
 
 
@@ -82,7 +82,7 @@ def imports(path: pathlib.Path) -> list[str]:
     """Chaque module importe par ce fichier, au niveau du module ou dans un corps.
 
     Les imports tardifs comptent autant que les autres : c'est justement par
-    un import tardif qu'on ferait rentrer crewai la ou il n'a rien a faire.
+    un import tardif qu'on ferait rentrer le SDK la ou il n'a rien a faire.
     """
     tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
     found = []
@@ -117,7 +117,7 @@ def target(module: str) -> str:
 
 @pytest.mark.parametrize("library, home", sorted(CONFINED.items()))
 def test_a_confined_library_appears_in_exactly_one_module(library, home):
-    """Ou vit crewai, ou vit le SDK — nulle part ailleurs, imports tardifs compris."""
+    """Ou vit le SDK — nulle part ailleurs, imports tardifs compris."""
     importers = sorted(
         str(p.relative_to(SRC)) for p in modules()
         if any(m == library or m.startswith(library + ".") for m in imports(p)))
@@ -273,7 +273,6 @@ def test_the_scan_actually_reads_the_package():
     assert any(imports(p) for p in files)
     # et la regle de confinement porte bien sur du code qui existe
     assert (SRC / "core/adapters/agent/claude_sdk.py").exists()
-    assert (SRC / "core/adapters/engine/crewai_engine.py").exists()
 
 
 # --- la forme d'un workflow ------------------------------------------------

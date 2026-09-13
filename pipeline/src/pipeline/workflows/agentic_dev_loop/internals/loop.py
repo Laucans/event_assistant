@@ -1,27 +1,27 @@
 """La boucle sur les rounds : ce qui depense le budget d'un run.
 
-Un Flow decrit un graphe, pas une repetition. Les rounds sont donc du Python
-ordinaire ici, autour de `flow` — et c'est aussi ce qui permet de
-faire tourner un round seul dans un test sans monter un run entier.
-
 Deux niveaux, et la separation compte pour le journal : `one_round` estampille
 chaque ligne `r<n>` et rend le total du round meme quand il halte, `run`
 enchaine et rend le total du run. Un round qui s'arrete a quand meme coute de
 l'argent, et c'est justement celui dont on veut le chiffre.
 
-L'import du round est tardif, dans le corps : le moteur coute ~1,3 s d'import
-et les chemins rapides ne doivent pas le payer.
+Il n'y a plus d'import tardif ici. Le round etait un graphe, son moteur
+coutait 1,6 s d'import, et ce module le chargeait dans un corps de fonction
+pour que les chemins rapides ne le paient pas. Un round est maintenant une
+sequence : `internals.round` s'importe comme n'importe quel module.
 """
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 
 from pipeline.core.adapters.store import resume
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.runtime.monitoring import metrics
 from pipeline.core.runtime.monitoring.logbook import Logbook
-from pipeline.workflows.agentic_dev_loop.internals import board
+from pipeline.workflows.agentic_dev_loop.internals import board, round as rnd
+from pipeline.workflows.agentic_dev_loop.internals.state import RoundState
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
 from pipeline.core.execution.contract.outcome import WorkflowOutcome
 from pipeline.core.adapters import hub
@@ -29,11 +29,11 @@ from pipeline.core.adapters import hub
 
 def _resume_point(cfg: RunConfig, here: board.Board, log: Logbook
                   ) -> Result[dict | None]:
-    """Ce qu'un round reprend, ou None s'il part du haut.
+    """L'etat qu'un round reprend, ou None s'il part du haut.
 
     Decide avant qu'aucune machinerie ne soit montee : un etat illisible doit
-    arreter le round tant que c'est encore gratuit, pas une fois que le flow
-    tient le meme magasin ouvert. Pose `here.resuming` en passant.
+    arreter le round tant que c'est encore gratuit, pas une fois qu'une
+    session est partie. Pose `here.resuming` en passant.
     """
     if cfg.restart:
         log("--restart — forgetting the completed stages for this task")
@@ -45,10 +45,10 @@ def _resume_point(cfg: RunConfig, here: board.Board, log: Logbook
     pending = here.find(known_task) if flow_id else None
     if pending is None:
         return Result.of(None)
-    read = resume.stages_done(flow_id, cfg.workspace.flow_db)
+    read = resume.load(flow_id, cfg.workspace.flow_db)
     if read.failed:
         return read.recast()
-    done = read.value
+    done = list(read.value.get("stages_done") or [])
     # Une task fermee dont aucun stage n'est enregistre est un pointeur
     # perime, pas un round a finir : la reprendre repayerait les trois
     # stages d'une task deja livree.
@@ -57,17 +57,16 @@ def _resume_point(cfg: RunConfig, here: board.Board, log: Logbook
     log(f"resuming task {pending.ref} — already completed:"
         f" {' '.join(done) if done else '(nothing yet)'}")
     here.resuming = pending
-    return Result.of({"id": flow_id})
+    return Result.of(read.value)
 
 
-def _account(cfg: RunConfig, flow, ctx, round_no: int, log: Logbook,
-             run_tally: "metrics.Tally | None") -> None:
+def _account(cfg: RunConfig, st: RoundState, ctx, round_no: int,
+             log: Logbook, run_tally: "metrics.Tally | None") -> None:
     """Ce qu'un round laisse derriere, qu'il aille au bout ou non.
 
     Appele dans un `finally` : un round qui s'arrete a quand meme coute de
     l'argent, et c'est justement celui dont on veut le chiffre.
     """
-    st = flow.state
     if not cfg.dry_run and st.task_key:
         resume.write_pointer(st.task_key, st.id, cfg.workspace.state)
     if ctx.tally.stages:
@@ -80,8 +79,8 @@ def _after_rollover(here: board.Board) -> Result[bool]:
     """Reste-t-il de quoi travailler apres le passage du planner ?
 
     Continuer n'a de sens que si le planner a ouvert une task : sinon les
-    rounds restants rejoueraient le meme constat, en payant un kickoff de
-    flow a chaque fois. Le tableau est relu — c'est justement ce que le
+    rounds restants rejoueraient le meme constat, en payant un round a
+    chaque fois. Le tableau est relu — c'est justement ce que le
     planner vient de changer.
     """
     return board.read(here.gh).map(lambda after: bool(after.open_agents))
@@ -93,12 +92,8 @@ async def one_round(cfg: RunConfig, round_no: int, log: Logbook, log_dir: Path,
 
     La valeur dit s'il reste du travail : True quand une task s'est fermee,
     False quand le rollover n'a rien ouvert. Un echec est l'arret du round,
-    avec la raison qu'un noeud a enregistree.
+    avec la raison que l'etape a rendue.
     """
-    # Import tardif : c'est ici, et nulle part avant, que le moteur est charge.
-    from pipeline.workflows.agentic_dev_loop.internals.flow import (
-        RoundCtx, build_flow)
-
     # Every line this round produces is stamped `r<n>`, so a journal that
     # interleaves rounds — or a terminal that interleaves a detached
     # pr-review — stays attributable.
@@ -114,26 +109,35 @@ async def one_round(cfg: RunConfig, round_no: int, log: Logbook, log_dir: Path,
     if resuming.failed:
         return resuming.recast()
 
-    ctx = RoundCtx(cfg=cfg, log=log, log_dir=log_dir, round_no=round_no,
-                   tally=metrics.Tally(), board=here,
-                   workspace=cfg.workspace)
-    flow = build_flow(ctx)()
+    ctx = rnd.RoundCtx(cfg=cfg, log=log, log_dir=log_dir, round_no=round_no,
+                       tally=metrics.Tally(), board=here,
+                       workspace=cfg.workspace)
+    # L'etat repris tel quel, ou un etat neuf sous un identifiant neuf. C'est
+    # le seul endroit qui le fabrique : le moteur le faisait avant, et son
+    # identifiant est ce que le pointeur de reprise designe.
+    st = (RoundState(**resuming.value) if resuming.value
+          else RoundState(id=uuid.uuid4().hex))
+
+    def save() -> None:
+        """L'etat apres une etape. Un dry-run lit le magasin, il n'ecrit pas —
+        sinon la prevision detruirait le point de reprise qu'elle decrit."""
+        if not cfg.dry_run:
+            resume.save(st.id, st.stages_done[-1] if st.stages_done else "",
+                        st.model_dump(), cfg.workspace.flow_db)
+
     try:
-        await flow.kickoff_async(inputs=resuming.value)
+        ran = await rnd.run(ctx, st, save=save)
     finally:
-        _account(cfg, flow, ctx, round_no, log, run_tally)
+        _account(cfg, st, ctx, round_no, log, run_tally)
+    if ran.failed:
+        return ran.recast()
 
-    # Un noeud qui s'est arrete l'a enregistre dans l'etat : le moteur, lui,
-    # rend la main normalement. C'est ici qu'un arret redevient un echec.
-    if flow.state.stopped:
-        return flow.state.halt.recast()
-
-    if flow.state.rollover:
+    if st.rollover:
         return _after_rollover(here)
     # The task is closed: the resume point has nothing left to describe.
     if not cfg.dry_run:
         resume.clear(cfg.workspace.state)
-    log(f"round {round_no} done — issue #{flow.state.task_num} closed")
+    log(f"round {round_no} done — issue #{st.task_num} closed")
     return Result.of(True)
 
 

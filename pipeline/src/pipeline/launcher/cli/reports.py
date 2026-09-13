@@ -2,7 +2,7 @@
 
 De la mise en forme, et rien d'autre : ces fonctions lisent le registre et
 l'etat de reprise, et rendent une chaine. Elles ne decident de rien, n'ecrivent
-rien, et sont sur le chemin rapide — bibliotheque standard, ni crewai ni SDK.
+rien, et sont sur le chemin rapide — bibliotheque standard, pas de SDK.
 
 Les deux rapports ont la meme forme — lire, ecarter ce qui est illisible,
 filtrer, agreger, rendre — et chaque etape est une fonction pure qui prend des
