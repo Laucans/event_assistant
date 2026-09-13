@@ -15,6 +15,7 @@ from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.workflows.agentic_dev_loop.settings import RunConfig
+from pipeline.workflows.agentic_dev_loop.workflow import WORKFLOW
 from pipeline.workflows.agentic_dev_loop.internals import loop as workflow_loop
 
 
@@ -25,11 +26,11 @@ def local(tmp_path):
 
 
 def spend(cfg, log_dir, answers):
-    """Fait tourner `run_rounds` avec un `one_round` scripte.
+    """Fait tourner la forme du blueprint avec un `one_round` scripte.
 
-    Rend `(rounds vus, le double)`. Le preflight n'est plus ici a ecarter :
-    c'est la precondition du workflow, et `run_rounds` ne fait plus que
-    repeter des rounds.
+    Rend `(rounds vus, le double)`. Ce que la forme fait de generique est
+    teste dans `tests/core/execution/test_shapes.py` ; ici c'est le cablage
+    de la boucle — son budget, sa phrase de fin, son code de sortie.
     """
     seen = []
 
@@ -44,9 +45,9 @@ def test_the_loop_stops_as_soon_as_a_round_says_nothing_is_left(
         tmp_path, monkeypatch):
     seen, one = spend(None, None, Result.of(False))
     monkeypatch.setattr(workflow_loop, "one_round", one)
-    asyncio.run(workflow_loop.run_rounds(
+    asyncio.run(WORKFLOW.shape.run(
         RunConfig(max_rounds=3, workspace=Workspace(tmp_path)),
-        logbook.null(), tmp_path))
+        logbook.null(), log_dir=tmp_path))
     assert seen == [1], "la boucle a rejoue un round qui ne pouvait rien ouvrir"
 
 
@@ -54,9 +55,9 @@ def test_the_loop_spends_its_budget_while_rounds_keep_closing_tasks(
         tmp_path, monkeypatch):
     seen, one = spend(None, None, Result.of(True))
     monkeypatch.setattr(workflow_loop, "one_round", one)
-    outcome = asyncio.run(workflow_loop.run_rounds(
+    outcome = asyncio.run(WORKFLOW.shape.run(
         RunConfig(max_rounds=3, workspace=Workspace(tmp_path)),
-        logbook.null(), tmp_path))
+        logbook.null(), log_dir=tmp_path))
     assert seen == [1, 2, 3]
     assert outcome.ok and "loop finished" in outcome.summary
 
@@ -71,9 +72,9 @@ def test_a_round_that_stops_ends_the_run_and_carries_its_reason(
     """
     seen, one = spend(None, None, Result.halt("l'arbre est sale"))
     monkeypatch.setattr(workflow_loop, "one_round", one)
-    outcome = asyncio.run(workflow_loop.run_rounds(
+    outcome = asyncio.run(WORKFLOW.shape.run(
         RunConfig(max_rounds=3, workspace=Workspace(tmp_path)),
-        logbook.null(), tmp_path))
+        logbook.null(), log_dir=tmp_path))
     assert seen == [1]
     assert outcome.failed and outcome.reason == "l'arbre est sale"
     assert outcome.exit_code == 1

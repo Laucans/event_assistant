@@ -1,53 +1,43 @@
-"""La revue consultative d'une PR, dans la forme que tout workflow a.
+"""La revue consultative d'une PR, declaree.
 
-Meme fichier, meme forme que `agentic_dev_loop/workflow.py` : la config, le
-journal, les deux gardes, et `run()` qui delegue a la sequence commune. Le
-travail est dans `internals/`.
+Meme fichier, meme forme que `agentic_dev_loop/workflow.py` : la declaration
+entiere, et rien d'autre. Ce qui l'entoure est monte par
+`core/design/build.py`.
 
-Elle ne charge aucun moteur de graphe : une revue est une sequence de deux
-passes, pas un graphe, et l'exprimer comme un flow lui ferait payer 1,3 s
-d'import pour rien.
+Elle ne charge aucun moteur : une revue est une sequence de deux passes et
+d'une publication, et c'est exactement ce que la forme `once` exprime.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass, field
-
-from pipeline.core.runtime.monitoring.logbook import Logbook
-from pipeline.core.execution.contract import workflow as contract
-from pipeline.core.execution.contract.outcome import WorkflowOutcome
-from pipeline.workflows.pr_review.internals import review
-from pipeline.workflows.pr_review.postconditions import ReviewPostconditions
-from pipeline.workflows.pr_review.preconditions import ReviewPreconditions
+from pipeline.core.design.blueprint import Blueprint
+from pipeline.core.execution.shapes.once import Once
+from pipeline.workflows.pr_review import preconditions, stages
+from pipeline.workflows.pr_review.internals import gates, review
 from pipeline.workflows.pr_review.settings import ReviewConfig
 
-
-@dataclass
-class PrReview:
-    """Deux passes sur une PR, livrees sur la PR.
-
-    Satisfait `contract.Workflow` sans en heriter, comme la boucle.
-
-    `warn` est la couture : le CLI le branche sur stderr — le hook lance la
-    revue **detachee**, donc c'est le seul canal qu'un appelant qui n'ouvre
-    pas le fichier de log verra passer.
-    """
-
-    config: ReviewConfig
-    log: Logbook
-    warn: Callable[[str], None] | None = None
-    preconditions: ReviewPreconditions = field(init=False)
-    postconditions: ReviewPostconditions = field(init=False)
-
-    def __post_init__(self) -> None:
-        self.preconditions = ReviewPreconditions(self.config, self.log)
-        self.postconditions = ReviewPostconditions(self.config, self.log)
-
-    async def run(self) -> WorkflowOutcome:
-        """Le workflow entier, dans l'ordre que le contrat impose."""
-        return await contract.sequence(self)
-
-    async def execute(self) -> WorkflowOutcome:
-        """La revue, une fois les outils verifies."""
-        return await review.run(self.config, self.log, warn=self.warn)
+WORKFLOW = Blueprint(
+    name="pr-review",
+    config=ReviewConfig,
+    gates=preconditions.CHECKS,
+    # Toutes les revues ecrivent dans le meme dossier : leurs artefacts sont
+    # prefixes par le numero de la PR, pas par un identifiant de run.
+    artifacts=lambda cfg: cfg.workspace.review_dir,
+    shape=Once(
+        plan=stages.passes,
+        state=review.ReviewState,
+        extra=stages.prompt_of,
+        precheck=review.precheck,
+        guard=review.one_at_a_time,
+        held=review.already_running,
+        tolerate=gates.a_silent_inline_pass_is_not_fatal,
+        summary=review.summary,
+        tally_as="review",
+    ),
+    # Rien a verifier apres : ce qu'une revue garantit, elle le garantit en
+    # chemin — ne pas payer la passe 2 quand la 1 a epuise le quota, ne rien
+    # poster quand la 2 n'a rien rendu. Et une revue **sautee** est un succes :
+    # une post-condition qui exigerait un commentaire poste ferait echouer
+    # exactement les cas que les regles de saut existent pour laisser passer.
+    obtained=None,
+)

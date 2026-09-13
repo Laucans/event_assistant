@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime
 
-from pipeline.core.adapters.shell.github import GitHub
+from pipeline.core.adapters import hub as adapters
 from pipeline.core.adapters.store import ledger
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.workflows.pr_review.internals import notes as review_notes
@@ -26,9 +26,16 @@ def _passes_line(cfg: ReviewConfig) -> str:
             f" notes `{cfg.brief_model}`")
 
 
-def publish(cfg: ReviewConfig, num: str, url: str, body: str, log: Logbook,
-            hub: GitHub) -> Result[None]:
-    """Monte le commentaire, le garde sur disque, puis le poste."""
+def post(ctx, state) -> Result[None]:
+    """L'etape de publication : monte le commentaire, le garde, le poste.
+
+    Une etape de la table qui ne paie rien. Le corps est ce que la passe 2 a
+    rendu — lu dans `ctx.results`, sous le nom de l'etape qui l'a produit.
+    """
+    cfg, log = ctx.cfg, ctx.log
+    num, url = state.pr.num, state.pr.url
+    body = ctx.results["brief"].text
+    hub = adapters.gh(cfg.workspace)
     cost = ledger.review_cost(cfg.workspace.review_ledger, num)
     path = cfg.workspace.review_dir / f"{num}-comment.md"
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")

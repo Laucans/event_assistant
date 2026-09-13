@@ -11,6 +11,7 @@ import pytest
 
 from pipeline.core.domain.outcomes.exit_codes import EXIT_QUOTA, EXIT_STAGE_FAILED
 from pipeline.core.domain.outcomes.result import Status
+from pipeline.core.execution.contract.settings import WorkflowConfig
 from pipeline.core.execution.session import Artifacts, failure_of
 
 
@@ -18,7 +19,7 @@ from pipeline.core.execution.session import Artifacts, failure_of
 
 
 def test_the_three_artifacts_hang_off_the_round_and_the_skill():
-    files = Artifacts.of(Path("/logs"), 7, "code")
+    files = Artifacts.of(Path("/logs"), "07", "code")
     assert files.log == Path("/logs/07-code.log")
     assert files.envelope == Path("/logs/07-code.json")
     assert files.trace == Path("/logs/07-code.trace.log")
@@ -26,13 +27,16 @@ def test_the_three_artifacts_hang_off_the_round_and_the_skill():
 
 def test_the_round_number_is_zero_padded_like_the_ledger_column():
     """Le registre ecrit la meme valeur dans sa colonne `round`."""
-    assert Artifacts.of(Path("/l"), 3, "s").log.name.startswith("03-")
-    assert Artifacts.of(Path("/l"), 12, "s").log.name.startswith("12-")
+    # Le zero-padding est la politique par defaut d'une config, plus une
+    # regle du nommeur : la revue prefixe par le numero de sa PR.
+    assert WorkflowConfig().artifact_tag(3) == "03"
+    assert WorkflowConfig().artifact_tag(12) == "12"
+    assert Artifacts.of(Path("/l"), "03", "s").log.name.startswith("03-")
 
 
 def test_two_stages_of_one_round_do_not_share_a_file():
-    one = Artifacts.of(Path("/l"), 1, "code")
-    two = Artifacts.of(Path("/l"), 1, "create-test")
+    one = Artifacts.of(Path("/l"), "01", "code")
+    two = Artifacts.of(Path("/l"), "01", "create-test")
     assert {one.log, one.envelope, one.trace}.isdisjoint(
         {two.log, two.envelope, two.trace})
 

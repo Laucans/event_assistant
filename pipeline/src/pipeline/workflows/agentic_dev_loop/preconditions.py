@@ -7,14 +7,13 @@ exige — les etiquettes du modele en issues, un milestone atteignable, les
 skills que la table nomme — et compose les deux listes dans l'ordre ou elles
 se verifient.
 
-Une porte ne leve pas : elle rend un `Result`. `verify()` rend le premier
-echec, et la sequence du contrat s'arrete la, avant qu'`execute()` ne depense
-quoi que ce soit.
+Une porte ne leve pas : elle rend un `Result`. `CHECKS` est ce que le
+blueprint recoit dans `gates=` ; `design.build` parcourt la liste et rend le
+premier echec, et la sequence du contrat s'arrete la, avant que la forme ne
+depense quoi que ce soit.
 """
 
 from __future__ import annotations
-
-from dataclasses import dataclass
 
 from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.core.domain.outcomes.result import Result
@@ -109,7 +108,7 @@ CHECKS: tuple[Check, ...] = (
 )
 
 
-def _announce(cfg: RunConfig, log: Logbook) -> None:
+def announce(cfg: RunConfig, log: Logbook) -> None:
     """Say what this run is about to do, once every gate has passed."""
     sha = hub.repo(cfg.workspace).head_sha()
     log(f"run {cfg.run_id} — branch {cfg.integration_branch} @ {sha or '?'},"
@@ -125,19 +124,3 @@ def _announce(cfg: RunConfig, log: Logbook) -> None:
     if cfg.heartbeat_s > 0:
         log.debug(f"heartbeat every {cfg.heartbeat_s:g}s; per-stage traces"
                   f" alongside run.log")
-
-
-@dataclass
-class LoopPreconditions:
-    """Les portes de la boucle, dans la forme que le contrat appelle."""
-
-    cfg: RunConfig
-    log: Logbook
-
-    def verify(self) -> Result[None]:
-        """Rend la premiere condition qui empeche la boucle de tourner."""
-        got = checks.verify_all(CHECKS, self.cfg, self.log)
-        if got.failed:
-            return got
-        _announce(self.cfg, self.log)
-        return Result.of(None)

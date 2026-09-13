@@ -1,9 +1,13 @@
 """La boucle sur les rounds : ce qui depense le budget d'un run.
 
-Deux niveaux, et la separation compte pour le journal : `one_round` estampille
-chaque ligne `r<n>` et rend le total du round meme quand il halte, `run`
-enchaine et rend le total du run. Un round qui s'arrete a quand meme coute de
-l'argent, et c'est justement celui dont on veut le chiffre.
+`one_round` estampille chaque ligne `r<n>` et rend le total du round meme
+quand il halte. Un round qui s'arrete a quand meme coute de l'argent, et
+c'est justement celui dont on veut le chiffre.
+
+Enchainer les rounds n'est plus ici : c'est la forme `Repeat` que le
+blueprint declare, et elle ne fait que ce qui ne depend d'aucun workflow —
+compter les tours, additionner la depense, savoir s'arreter. Ce module ne
+porte plus que l'unite qu'elle repete.
 
 Il n'y a plus d'import tardif ici. Le round etait un graphe, son moteur
 coutait 1,6 s d'import, et ce module le chargeait dans un corps de fonction
@@ -108,6 +112,10 @@ async def one_round(cfg: RunConfig, round_no: int, log: Logbook, log_dir: Path,
     resuming = _resume_point(cfg, here, log)
     if resuming.failed:
         return resuming.recast()
+    # `--restart` ne vaut que pour le premier round : les suivants reprennent
+    # ce que celui-ci vient d'ecrire. C'etait la seule ligne que la boucle sur
+    # les rounds avait a savoir de son unite.
+    cfg.restart = False
 
     ctx = rnd.RoundCtx(cfg=cfg, log=log, log_dir=log_dir, round_no=round_no,
                        tally=metrics.Tally(), board=here,
@@ -139,34 +147,3 @@ async def one_round(cfg: RunConfig, round_no: int, log: Logbook, log_dir: Path,
         resume.clear(cfg.workspace.state)
     log(f"round {round_no} done — issue #{st.task_num} closed")
     return Result.of(True)
-
-
-async def run_rounds(cfg: RunConfig, log: Logbook,
-                     log_dir: Path) -> WorkflowOutcome:
-    """Les rounds, jusqu'au budget ou jusqu'au premier qui s'arrete.
-
-    Le preflight n'est plus ici : c'est la precondition du workflow, et la
-    sequence du contrat la passe avant d'appeler ceci. Ce module ne fait plus
-    que ce que son nom dit — repeter des rounds.
-    """
-    tally = metrics.Tally()
-    stopped: Result[bool] | None = None
-    try:
-        for round_no in range(1, cfg.max_rounds + 1):
-            log(f"round {round_no}/{cfg.max_rounds}")
-            more = await one_round(cfg, round_no, log, log_dir, tally)
-            cfg.restart = False
-            if more.failed:
-                stopped = more
-                break
-            if not more.value:
-                log("nothing left to open — stopping rather than replaying"
-                    " the rollover")
-                break
-    finally:
-        if tally.stages:
-            log(tally.summary("loop"))
-    if stopped is not None:
-        return WorkflowOutcome.of_result(stopped)
-    return WorkflowOutcome.done(
-        f"loop finished — logs in {cfg.workspace.rel(log_dir)}")

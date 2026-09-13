@@ -32,7 +32,8 @@ from pipeline.core.runtime.monitoring.logbook import Logbook  # noqa: E402
 from pipeline.workflows.agentic_dev_loop.settings import (  # noqa: E402
     ConfigError, RunConfig)
 from pipeline.workflows.agentic_dev_loop.workflow import (  # noqa: E402
-    AgenticDevLoop)
+    WORKFLOW)
+from pipeline.core.design import build  # noqa: E402
 from pipeline.workflows.legacy import migrate  # noqa: E402
 
 
@@ -215,13 +216,15 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as exc:
         return _unbuildable(exc)
 
-    log_dir = cfg.workspace.loop_dir / cfg.run_id
+    # Le meme dossier que la forme utilisera : le blueprint le nomme, et le
+    # recalculer ici ferait deux endroits a tenir d'accord.
+    log_dir = WORKFLOW.artifacts(cfg)
     log_dir.mkdir(parents=True, exist_ok=True)
     log = make_logger(log_dir, run_id=cfg.run_id, level=_verbosity(args))
     where = cfg.workspace.rel(log_dir)
 
     try:
-        outcome = asyncio.run(AgenticDevLoop(cfg, log, log_dir).run())
+        outcome = asyncio.run(build.workflow(WORKFLOW, cfg, log).run())
     except KeyboardInterrupt:
         log.warn("interrupted")
         return EXIT_INTERRUPTED

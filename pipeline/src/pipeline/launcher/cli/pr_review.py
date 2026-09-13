@@ -29,14 +29,10 @@ from pipeline.core.domain.outcomes.exit_codes import (  # noqa: E402
 from pipeline.core.runtime.filesystem.workspace import Workspace  # noqa: E402
 from pipeline.core.runtime.monitoring import logbook  # noqa: E402
 from pipeline.core.runtime.monitoring.logbook import Logbook  # noqa: E402
-from pipeline.workflows.pr_review.settings import ReviewConfig  # noqa: E402
-from pipeline.workflows.pr_review.workflow import PrReview  # noqa: E402
-
-
-def token(pr: str) -> str:
-    """A filename-safe handle for a PR given as a number or as a URL."""
-    match = re.search(r"(\d+)\s*$", pr)
-    return match.group(1) if match else re.sub(r"[^0-9A-Za-z._-]", "-", pr)[:40]
+from pipeline.core.design import build  # noqa: E402
+from pipeline.workflows.pr_review.settings import (  # noqa: E402
+    ReviewConfig, token)
+from pipeline.workflows.pr_review.workflow import WORKFLOW  # noqa: E402
 
 
 def make_logger(pr: str, workspace: Workspace, *,
@@ -121,6 +117,10 @@ def build_config(args: argparse.Namespace) -> ReviewConfig:
         brief_model=args.model or os.environ.get("PR_REVIEW_BRIEF_MODEL", "sonnet"),
         brief_effort=os.environ.get("PR_REVIEW_BRIEF_EFFORT", "low"),
         workspace=Workspace.here(),
+        # Le hook lance ceci detache : stderr est la seule chose qu'un
+        # appelant qui n'ouvre pas le fichier de log verra passer. Le workflow
+        # dit ce qui merite ce canal-la, le CLI decide que ce canal est stderr.
+        warn=lambda msg: print(msg, file=sys.stderr),
     )
 
 
@@ -179,9 +179,5 @@ async def _main(argv: list[str] | None = None) -> int:
     level = (logbook.VERBOSE if args.verbose
              else logbook.QUIET if args.quiet else logbook.NORMAL)
     log = make_logger(args.pr, cfg.workspace, level=level)
-    # Le hook lance ceci detache : stderr est la seule chose qu'un appelant
-    # qui n'ouvre pas le fichier de log verra passer. Le workflow dit ce qui
-    # merite ce canal-la, le CLI decide que ce canal est stderr.
-    outcome = await PrReview(
-        cfg, log, warn=lambda msg: print(msg, file=sys.stderr)).run()
+    outcome = await build.workflow(WORKFLOW, cfg, log).run()
     return outcome.report(log).exit_code

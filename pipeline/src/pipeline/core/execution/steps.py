@@ -48,7 +48,8 @@ async def run_sequence(steps: Iterable[Step], *, ctx, state,
                        run: Callable[[Step], Awaitable[Result]],
                        log: Callable[[str], None],
                        excluded: Callable[[Step], bool] | None = None,
-                       save: Callable[[], None] | None = None
+                       save: Callable[[], None] | None = None,
+                       tolerate: Callable[[Step, Result], str | None] | None = None
                        ) -> Result[None]:
     """Les etapes, dans l'ordre, jusqu'a la premiere qui echoue.
 
@@ -65,6 +66,13 @@ async def run_sequence(steps: Iterable[Step], *, ctx, state,
     ce qui rend la sequence reprenable, et le point exact ou l'etat vaut la
     peine d'etre ecrit — une etape est atomique, une demi-etape ne se reprend
     pas.
+
+    `tolerate` dit qu'un echec **de cette etape-la** n'arrete pas la
+    sequence : il rend la ligne a journaliser, ou None pour s'arreter comme
+    d'habitude. Une seule etape s'en sert, et elle a une raison — la passe
+    ligne a ligne d'une revue peut ne rien rendre sans que les notes cessent
+    d'avoir de la valeur, alors qu'un quota epuise doit bien arreter la
+    suite. Un `bool` n'aurait pas su dire la difference.
     """
     for step in steps:
         if excluded is not None and excluded(step):
@@ -82,7 +90,10 @@ async def run_sequence(steps: Iterable[Step], *, ctx, state,
                 return before
         ran = await run(step)
         if ran.failed:
-            return ran
+            said = tolerate(step, ran) if tolerate is not None else None
+            if said is None:
+                return ran
+            log(said)
         if step.after is not None:
             after = step.after(ctx, state)
             if after.failed:

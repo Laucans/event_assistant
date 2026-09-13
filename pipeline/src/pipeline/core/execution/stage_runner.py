@@ -16,6 +16,7 @@ from __future__ import annotations
 from pipeline.core.execution import session
 from pipeline.core.execution.context import Ctx, StagePolicy
 from pipeline.core.domain.outcomes.result import Result
+from pipeline.core.domain.outcomes.stage_result import StageResult
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.core.runtime.monitoring.logbook import Logbook
 
@@ -48,7 +49,7 @@ class StageRunner:
         return True
 
     async def run(self, spec: StageSpec, *, done: list[str], extra: str = "",
-                  mark: bool = True) -> Result[None]:
+                  mark: bool = True) -> Result["StageResult | None"]:
         """Fait tourner un stage, au plus une fois par task, tous runs confondus.
 
         `done` est la liste des stages deja faits pour cette task — celle que
@@ -86,7 +87,9 @@ class StageRunner:
         # Un dry-run n'execute rien : il ne peut pas declarer un stage fait.
         if mark and not self.cfg.dry_run:
             done.append(spec.skill)
-        return Result.of(None)
+        # Rendu plutot que jete : une passe qui alimente la suivante a besoin
+        # du texte de la precedente, et le round n'en fait rien.
+        return Result.of(result)
 
     # La task en cours, posee par le round une fois qu'il l'a choisie. Elle
     # ne va que dans la colonne `task` du registre, d'ou le defaut vide

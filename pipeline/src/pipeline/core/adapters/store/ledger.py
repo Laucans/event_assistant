@@ -102,8 +102,12 @@ def rows(ledger: Path) -> list[list[str]]:
 
 # The PR review keeps a register of its own: different columns, different
 # rows, and a review's cost is not mixed into a round's.
+# `outcome` a ete ajoutee en fin de ligne, comme celle du registre des
+# stages : les lignes ecrites avant elle en ont dix et restent lisibles. Sans
+# elle, l'argent brule par une passe coupee se lisait comme de l'argent qui
+# avait achete quelque chose.
 REVIEW_HEADER = ("when\tpr\tpass\tcost_usd\tturns\tduration_ms\tin\tout"
-                 "\tsession\tran_on\n")
+                 "\tsession\tran_on\toutcome\n")
 
 REVIEW_COLUMNS = REVIEW_HEADER.rstrip("\n").split("\t")
 _REVIEW_AT = {name: index for index, name in enumerate(REVIEW_COLUMNS)}
@@ -114,7 +118,8 @@ REVIEW_COST = _REVIEW_AT["cost_usd"]
 
 def append_review(ledger: Path, *, pr: str, label: str, cost: float | None,
                   turns: object, duration_ms: object, tokens_in: object,
-                  tokens_out: object, session: object, ran_on: str) -> None:
+                  tokens_out: object, session: object, ran_on: str,
+                  outcome: str = "") -> None:
     row = {
         "when": datetime.datetime.now().isoformat(timespec="seconds"),
         "pr": pr,
@@ -126,6 +131,7 @@ def append_review(ledger: Path, *, pr: str, label: str, cost: float | None,
         "out": tokens_out,
         "session": session,
         "ran_on": ran_on,
+        "outcome": outcome,
     }
     fresh = not ledger.exists()
     ledger.parent.mkdir(parents=True, exist_ok=True)
