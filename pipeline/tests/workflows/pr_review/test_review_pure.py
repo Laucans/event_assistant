@@ -11,26 +11,6 @@ import pytest
 
 from pipeline.core.domain.outcomes.result import Status
 from pipeline.core.execution.session import failure_of
-from pipeline.workflows.pr_review.internals.pr import Pr
-
-META = {"number": 12, "baseRefName": "main_agent", "headRefName": "feat/x",
-        "title": "Un titre de PR", "url": "https://github.com/o/r/pull/12",
-        "state": "OPEN", "isDraft": False}
-
-
-# --- les metadonnees d'une PR ----------------------------------------------
-
-
-def test_a_pr_reads_the_five_fields_the_review_needs():
-    pr = Pr.of(META)
-    assert (pr.num, pr.base, pr.head) == ("12", "main_agent", "feat/x")
-    assert (pr.title, pr.url) == ("Un titre de PR", META["url"])
-
-
-def test_the_number_is_a_string_because_every_reader_wants_one():
-    """Il nomme des fichiers et part dans des commandes `gh`, jamais en int."""
-    assert Pr.of({**META, "number": 7}).num == "7"
-
 
 # --- ce qu'une session qui n'a rien rendu vaut -----------------------------
 

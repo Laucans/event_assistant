@@ -249,8 +249,7 @@ CLOSES = r"^[ \t]*(?:closes|fixes|resolves)[ \t]+#(\d+)[ \t]*$"
 | Module | Porte |
 | --- | --- |
 | `internals/skip_rules.py` | quelles PR ne sont pas revues |
-| `internals/review.py` | pré-contrôle, verrou, phrase de fin |
-| `internals/pr.py` | les cinq champs qu'une revue lit d'une PR |
+| `internals/review.py` | pré-contrôle, garde du verrou, phrase de fin |
 | `internals/notes.py` | le texte publié : marqueur, pied de page |
 | `internals/publish.py` | l'étape de publication |
 | `internals/gates.py` | `--no-inline`, dry-run, tolérance de la passe 1 |

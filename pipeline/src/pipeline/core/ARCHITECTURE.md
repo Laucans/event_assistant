@@ -35,6 +35,7 @@ Le framework. Ce qui l'utilise : `workflows/ARCHITECTURE.md`.
 | `stage_spec.py` | `StageSpec` : une étape payante. `EFFORTS` |
 | `action.py` | `Action` : une étape locale |
 | `issues.py` | `Issue` : ce que GitHub rend |
+| `pulls.py` | `Pr` : ce qu'on lit d'une PR |
 | `prompts.py` | préambule, bloc de portée, composition |
 | `outcomes/result.py` | `Result[T]`, `Status` |
 | `outcomes/stage_result.py` | `StageResult`, marqueurs |
@@ -79,6 +80,7 @@ AGENT_LOOP_STOP:  la session s'arrête d'elle-même
 | --- | --- |
 | `filesystem/paths.py` | `repo_root()`. Résolu une fois, mémorisé |
 | `filesystem/workspace.py` | `Workspace` : la racine, et les chemins dérivés |
+| `filesystem/lock.py` | `claim(where, name)` : un `mkdir` atomique, un porteur |
 | `monitoring/logbook.py` | `Logbook`, `open_logbook`, `null` |
 | `monitoring/metrics.py` | `Tally`, `stage_line`, ratios de cache |
 
@@ -121,11 +123,12 @@ hub.repo(cfg.workspace)    # git
 | --- | --- |
 | `binaries.py` | `installed()`. `shutil` résolu à l'appel, pour la couture de test |
 | `git.py` | `Git` : branche, sha, arbre sale, existence de branche |
-| `github.py` | `GitHub` : issues, sous-issues, bloqueurs, PR mergées, étiquettes |
+| `github.py` | `GitHub` : issues, sous-issues, bloqueurs, PR, étiquettes |
 | `notify.py` | `notify()` via osascript. Ce qu'un humain absent verra |
 
 - Lectures qui décident : rendent `Result`.
 - `pr`, `comment_bodies`, `post_comment` : rendent `(valeur, pourquoi)`.
+- `PR_FIELDS` : les champs demandés à `gh pr view`. Désérialisés en `Pr`.
 - L'adaptateur ne décide de rien. Il ne sait pas ce qu'une étiquette signifie.
 
 ### `store/`
