@@ -29,44 +29,8 @@ from pipeline.core.domain import prompts
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.workflows.agentic_dev_loop.stages import (
     INJECTOR, PIPELINE, ROLLOVER)
-from pipeline.core.execution.contract.settings import WorkflowConfig
-
-
-class ConfigError(Exception):
-    """Une variable d'environnement illisible, vue avant tout le reste.
-
-    La seule exception que ce paquet leve encore. Tout le reste rend un
-    `Result` — mais une config qui ne se construit pas n'a pas d'objet a qui
-    rendre quoi que ce soit : `RunConfig()` est ce qui echoue, et il n'y a
-    pas de `cfg` de l'autre cote. Le point d'entree l'attrape, l'imprime sur
-    stderr et rend le code d'un arret volontaire.
-    """
-
-
-def _number(name: str, default: str, cast):
-    """Une variable numerique de l'environnement, ou son defaut.
-
-    Deux comportements, et chacun repare quelque chose :
-
-    - **le vide vaut absent**, comme le `${MAX_ROUNDS:-3}` du shell. Un
-      `MAX_ROUNDS=` dans un fichier d'environnement est une variable qu'on a
-      commentee a moitie, pas une demande de zero round ;
-    - **une valeur illisible nomme la variable**. Un `int()` nu levait une
-      `ValueError` qui ne disait ni laquelle ni ou la corriger — et comme la
-      config est construite avant que le journal existe, cette trace partait
-      sur un stderr que personne ne garde.
-    """
-    raw = os.environ.get(name, "").strip()
-    try:
-        return cast(raw or default)
-    except ValueError:
-        # La config est construite avant qu'un journal existe, et avant
-        # qu'un `Result` ait un appelant a qui se rendre : c'est le seul
-        # endroit du paquet ou lever reste la seule facon de se faire
-        # entendre. Le point d'entree l'attrape et l'imprime.
-        raise ConfigError(f"{name}={raw!r} is not a number — fix it in the"
-                          f" environment, or unset it to use"
-                          f" {default}") from None
+from pipeline.core.execution.contract.settings import (
+    WorkflowConfig, env_number)
 
 
 @dataclass
@@ -78,7 +42,7 @@ class RunConfig(WorkflowConfig):
     permission_mode: str = field(
         default_factory=lambda: os.environ.get("PERMISSION_MODE", "bypassPermissions"))
     max_rounds: int = field(
-        default_factory=lambda: _number("MAX_ROUNDS", "3", int))
+        default_factory=lambda: env_number("MAX_ROUNDS", "3", int))
     stages: str = field(default_factory=lambda: os.environ.get("STAGES", ""))
     model: str = field(default_factory=lambda: os.environ.get("MODEL", ""))
     effort: str = field(default_factory=lambda: os.environ.get("EFFORT", ""))
@@ -87,7 +51,7 @@ class RunConfig(WorkflowConfig):
     # Le battement de `WorkflowConfig`, mais reglable par l'environnement :
     # c'est la boucle, et elle seule, qui tourne sans personne devant.
     heartbeat_s: float = field(
-        default_factory=lambda: _number("HEARTBEAT_SECONDS", "60", float))
+        default_factory=lambda: env_number("HEARTBEAT_SECONDS", "60", float))
     restart: bool = False
     run_id: str = ""
     # La table que ce run fait tourner, et l'entree de rollover qui la suit.

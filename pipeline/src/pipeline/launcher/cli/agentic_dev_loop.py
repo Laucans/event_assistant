@@ -29,8 +29,8 @@ from pipeline.core.domain.outcomes.exit_codes import (  # noqa: E402
 from pipeline.core.runtime.filesystem.workspace import Workspace  # noqa: E402
 from pipeline.core.runtime.monitoring import logbook  # noqa: E402
 from pipeline.core.runtime.monitoring.logbook import Logbook  # noqa: E402
-from pipeline.workflows.agentic_dev_loop.settings import (  # noqa: E402
-    ConfigError, RunConfig)
+from pipeline.core.execution.contract.settings import ConfigError  # noqa: E402
+from pipeline.workflows.agentic_dev_loop.settings import RunConfig  # noqa: E402
 from pipeline.workflows.agentic_dev_loop.workflow import (  # noqa: E402
     WORKFLOW)
 from pipeline.core.design import build  # noqa: E402

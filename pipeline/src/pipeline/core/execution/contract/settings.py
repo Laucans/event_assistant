@@ -18,11 +18,49 @@ plus propre, et en inventer un vide ferait partir une session sans son texte.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
 from pipeline.core.adapters.store import ledger
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.core.runtime.filesystem.workspace import Workspace
+
+
+class ConfigError(Exception):
+    """Une variable d'environnement illisible, vue avant tout le reste.
+
+    La seule exception que ce paquet leve encore. Tout le reste rend un
+    `Result` — mais une config qui ne se construit pas n'a pas d'objet a qui
+    rendre quoi que ce soit : `RunConfig()` est ce qui echoue, et il n'y a
+    pas de `cfg` de l'autre cote. Le point d'entree l'attrape, l'imprime sur
+    stderr et rend le code d'un arret volontaire.
+    """
+
+
+def env_number(name: str, default: str, cast):
+    """Une variable numerique de l'environnement, ou son defaut.
+
+    Deux comportements, et chacun repare quelque chose :
+
+    - **le vide vaut absent**, comme le `${MAX_ROUNDS:-3}` du shell. Un
+      `MAX_ROUNDS=` dans un fichier d'environnement est une variable qu'on a
+      commentee a moitie, pas une demande de zero round ;
+    - **une valeur illisible nomme la variable**. Un `int()` nu levait une
+      `ValueError` qui ne disait ni laquelle ni ou la corriger — et comme la
+      config est construite avant que le journal existe, cette trace partait
+      sur un stderr que personne ne garde.
+    """
+    raw = os.environ.get(name, "").strip()
+    try:
+        return cast(raw or default)
+    except ValueError:
+        # La config est construite avant qu'un journal existe, et avant
+        # qu'un `Result` ait un appelant a qui se rendre : c'est le seul
+        # endroit du paquet ou lever reste la seule facon de se faire
+        # entendre. Le point d'entree l'attrape et l'imprime.
+        raise ConfigError(f"{name}={raw!r} is not a number — fix it in the"
+                          f" environment, or unset it to use"
+                          f" {default}") from None
 
 
 @dataclass

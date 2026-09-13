@@ -414,7 +414,7 @@ def env_knobs() -> set[str]:
         # troisieme sans l'ajouter ici ferait echouer
         # `test_the_knob_scan_actually_finds_something`, qui nomme MAX_ROUNDS.
         found |= set(re.findall(
-            r"(?:os\.environ\.get|_number)\(\"([A-Z][A-Z0-9_]+)\"",
+            r"(?:os\.environ\.get|env_number)\(\"([A-Z][A-Z0-9_]+)\"",
             path.read_text(encoding="utf-8")))
     return found - NOT_A_KNOB
 
