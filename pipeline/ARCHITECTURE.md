@@ -4,7 +4,7 @@
 
 - Runner non surveillé. Dépense un budget de sessions Claude Code contre des issues GitHub.
 - Deux workflows : la boucle de développement, la revue consultative de PR.
-- Python ≥ 3.13. Deux dépendances : `claude-agent-sdk`, `pydantic`.
+- Python ≥ 3.14. Deux dépendances : `claude-agent-sdk`, `pydantic`.
 
 ## Les trois paquets
 
@@ -74,11 +74,10 @@ pipeline/.venv/bin/python -m pytest pipeline/tests
 ## Installation
 
 ```bash
-/opt/homebrew/opt/python@3.13/bin/python3.13 -m venv pipeline/.venv
+/opt/homebrew/opt/python@3.14/bin/python3.14 -m venv pipeline/.venv
 pipeline/.venv/bin/pip install -e 'pipeline[dev]'
 ```
 
-- Le venv est épinglé sur 3.13. La machine tourne en 3.14.
 - `pipeline/.envrc` met ce venv sur le `PATH` via direnv.
 - Les sept étiquettes `pipeline:` doivent exister. Le préflight imprime les commandes.
 

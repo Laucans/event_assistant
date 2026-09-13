@@ -2,7 +2,7 @@
 name = "pipeline"
 version = "0.1.0"
 description = "The unattended pipeline runner: a sequence of Claude Code sessions."
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "claude-agent-sdk>=0.2.150",
     # Le modele d'etat d'un round. Arrivait avec crewai ; declare ici depuis
