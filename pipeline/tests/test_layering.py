@@ -388,10 +388,50 @@ def workflow_packages() -> list[pathlib.Path]:
                   and d.name not in NOT_A_WORKFLOW)
 
 
+def cli_routes() -> list:
+    """Les routes de protocole `cli` — celles qui lancent un workflow."""
+    from pipeline.launcher import routes
+
+    return [r for r in routes.ROUTES if r.protocol == "cli"]
+
+
+def workflow_of(route) -> set[str]:
+    """Le ou les workflows qu'un module CLI importe.
+
+    Par les imports et non par `route.name` : `loop` cible
+    `agentic_dev_loop` et `pr-review` cible `pr_review` — le nom de la
+    commande n'est pas celui du paquet, et ne l'a jamais ete.
+    """
+    module = SRC / (route.target.removeprefix("pipeline.").replace(".", "/")
+                    + ".py")
+    named = set()
+    for imported in imports(module):
+        parts = imported.split(".")
+        if len(parts) > 2 and parts[1] == "workflows":
+            named.add(parts[2])
+    return named - NOT_A_WORKFLOW
+
+
 def test_the_workflow_scan_actually_finds_the_workflows():
-    """Un scan qui ne trouve rien ferait passer les trois tests suivants."""
+    """Un scan qui ne trouve rien ferait passer les trois tests suivants.
+
+    Derive de `ROUTES` plutot qu'ecrit en dur : un troisieme workflow ajoute
+    sa route, et ce test le suit au lieu de tomber. Ce qu'il garde est
+    l'aller-retour — un paquet de `workflows/` que personne ne peut lancer,
+    ou une route `cli` qui cible un workflow qui n'existe pas.
+    """
     found = {d.name for d in workflow_packages()}
-    assert found == {"agentic_dev_loop", "pr_review"}, found
+    assert found, "aucun workflow trouve"
+    assert len(found) >= 2, found
+
+    routed: set[str] = set()
+    for route in cli_routes():
+        named = workflow_of(route)
+        assert named, f"{route.name} ne nomme aucun workflow"
+        routed |= named
+    assert routed == found, (
+        f"routes et paquets ne se recouvrent pas — routes : {sorted(routed)},"
+        f" paquets : {sorted(found)}")
 
 
 @pytest.mark.parametrize("module", ROOT_MODULES)

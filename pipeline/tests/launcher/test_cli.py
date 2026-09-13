@@ -416,15 +416,34 @@ def env_knobs() -> set[str]:
     return found - NOT_A_KNOB
 
 
-def test_every_environment_variable_the_code_reads_is_in_a_help_epilog(capsys):
-    """D6 : six `PR_REVIEW_*` etaient lues et documentees nulle part."""
-    from pipeline.launcher.cli import pr_review as review
+def cli_epilogs(capsys) -> tuple[str, int]:
+    """Le `--help` de chaque route `cli`, concatene, et combien il y en a.
+
+    Par la table des routes et non par une liste ecrite ici : un troisieme
+    CLI ajoute sa route, et un CLI oublie serait ignore **en silence**, ce
+    qui est pire qu'un test rouge.
+    """
+    import importlib
+
+    from pipeline.launcher import routes
 
     documented = ""
-    for parse in (loop.parse_args, review.parse_args):
+    scanned = 0
+    for route in routes.ROUTES:
+        if route.protocol != "cli":
+            continue
+        module = importlib.import_module(route.target)
         with pytest.raises(SystemExit):
-            parse(["--help"])
+            module.parse_args(["--help"])
         documented += capsys.readouterr().out
+        scanned += 1
+    return documented, scanned
+
+
+def test_every_environment_variable_the_code_reads_is_in_a_help_epilog(capsys):
+    """D6 : six `PR_REVIEW_*` etaient lues et documentees nulle part."""
+    documented, scanned = cli_epilogs(capsys)
+    assert scanned >= 2, f"le balayage n'a couvert que {scanned} CLI"
     missing = sorted(var for var in env_knobs() if var not in documented)
     assert not missing, "variables lues nulle part documentees : %s" % missing
 
