@@ -4,17 +4,20 @@ Deux magasins, et c'est deliberе :
 
 - `.llocal/agent-loop/state`, un pointeur de deux lignes (`task=`, `flow_id=`)
   qui reste lisible au `cat` et effacable a la main ;
-- `.llocal/agent-loop/flow_states.db`, ecrit par le `@persist` du moteur, qui
-  porte l'etat complet du round et rend la reprise possible.
+- `.llocal/agent-loop/flow_states.db`, qui porte l'etat complet du round et
+  rend la reprise possible.
 
-Le pointeur existe parce que `--status` doit repondre sans importer le moteur
-(2,5 s d'import pour imprimer deux lignes), et parce qu'un etat de boucle que
-personne ne peut lire est un etat que personne ne debogue.
+Le pointeur existe parce qu'un etat de boucle que personne ne peut lire est
+un etat que personne ne debogue : deux lignes, lisibles au `cat`, effacables
+a la main.
 
-La lecture des stages deja faits passe par le sqlite3 de la bibliotheque
-standard, pour la meme raison. Le schema est donc connu de deux cotes : le
-moteur l'ecrit, ce module le relit. C'est le prix a payer pour que le chemin
-rapide reste rapide, et c'est le seul endroit ou ce couplage existe.
+Le schema du second etait celui du `@persist` d'un moteur de graphe : il
+l'ecrivait, ce module le relisait en sqlite3 standard parce que `--status` ne
+pouvait pas payer 1,6 s d'import pour imprimer deux lignes. Un schema connu
+de deux cotes dont un seul etait a nous. Les deux bouts sont ici desormais —
+`save` ecrit, `load` et `stages_done` relisent — et les colonnes sont restees
+les memes, donc un magasin ecrit par l'ancien moteur se relit sans rien
+migrer.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from __future__ import annotations
 import contextlib
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pipeline.core.domain.outcomes.result import Result
@@ -50,6 +54,37 @@ def clear(state: Path) -> None:
     state.unlink(missing_ok=True)
 
 
+# Le schema, tel que le `@persist` du moteur l'ecrivait. Garde a l'identique :
+# une boucle interrompue avant ce changement doit pouvoir etre reprise apres.
+_SCHEMA = """CREATE TABLE IF NOT EXISTS flow_states (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flow_uuid TEXT NOT NULL,
+    method_name TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    state_json TEXT NOT NULL
+)"""
+
+
+def save(flow_id: str, step: str, state: dict, db: Path) -> None:
+    """L'etat du round apres une etape, ajoute au magasin.
+
+    Une ligne par etape plutot qu'une mise a jour : `stages_done` lit la
+    derniere ligne du flow, et garder les precedentes rend une reprise ratee
+    lisible apres coup. Le magasin est efface avec la task, pas au fil de
+    l'eau.
+    """
+    db.parent.mkdir(parents=True, exist_ok=True)
+    with contextlib.closing(sqlite3.connect(db)) as conn:
+        with conn:
+            conn.execute(_SCHEMA)
+            conn.execute(
+                "INSERT INTO flow_states"
+                " (flow_uuid, method_name, timestamp, state_json)"
+                " VALUES (?, ?, ?, ?)",
+                (flow_id, step, datetime.now(timezone.utc).isoformat(),
+                 json.dumps(state)))
+
+
 def _unreadable(path: Path, exc: Exception) -> Result[list[str]]:
     """The one degraded read in this package that costs money if it is quiet.
 
@@ -65,19 +100,16 @@ def _unreadable(path: Path, exc: Exception) -> Result[list[str]]:
         f" to replay this task from the top.")
 
 
-def stages_done(flow_id: str, db: Path) -> Result[list[str]]:
-    """The stages already finished, read from `@persist`'s store.
+def load(flow_id: str, db: Path) -> Result[dict]:
+    """L'etat le plus recent de ce flow, ou `{}`.
 
-    The engine's schema is `flow_states(flow_uuid, method_name, timestamp,
-    state_json)`: one row per persisted method, so the flow's last row carries
-    the most recent state.
-
-    Rend un `Result` illisible quand le magasin existe mais ne se lit pas. Un
-    magasin absent, un flow inconnu et un id vide veulent tous dire la meme
-    chose, inoffensive — rien n'a encore tourne — et rendent `[]`.
+    Une ligne par etape, donc la derniere ligne du flow porte l'etat le plus
+    recent. Rend un `Result` illisible quand le magasin existe mais ne se lit
+    pas : un magasin absent, un flow inconnu et un id vide veulent tous dire
+    la meme chose, inoffensive — rien n'a encore tourne — et rendent `{}`.
     """
     if not flow_id or not db.exists():
-        return Result.of([])
+        return Result.of({})
     try:
         # `with sqlite3.connect(...)` manages the transaction, not the
         # connection: it left one open per call. Read-only, so there is no
@@ -90,8 +122,19 @@ def stages_done(flow_id: str, db: Path) -> Result[list[str]]:
     except sqlite3.Error as exc:
         return _unreadable(db, exc)
     if not row:
-        return Result.of([])
+        return Result.of({})
     try:
-        return Result.of(list(json.loads(row[0]).get("stages_done") or []))
+        return Result.of(dict(json.loads(row[0])))
     except (ValueError, AttributeError, TypeError) as exc:
         return _unreadable(db, exc)
+
+
+def stages_done(flow_id: str, db: Path) -> Result[list[str]]:
+    """Les stages deja finis pour ce flow, relus dans le magasin.
+
+    Ce que `--status` imprime, et ce que la boucle lit pour ne pas repayer un
+    stage. Un magasin illisible n'est pas « rien n'a tourne » : les deux
+    reponses valent une session de `/code` d'ecart, et `load` le dit.
+    """
+    return load(flow_id, db).map(
+        lambda state: list(state.get("stages_done") or []))

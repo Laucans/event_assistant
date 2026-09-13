@@ -13,10 +13,12 @@ dit ce que le produit fait, `INTERNALS.md` dit comment on s'en sert.
 Avant tout le reste, ces trois contraintes reviennent partout. Si un choix te
 paraît bizarre, c'est presque toujours l'une des trois.
 
-1. **crewai coûte 1,4 à 1,8 s d'import** (selon le cache) et tire chromadb,
-   openai, opentelemetry.
+1. **Le SDK d'agent est lourd à importer.**
    D'où : il n'existe que dans un fichier, et `--status`/`--costs` répondent
-   en 25 ms parce qu'ils ne le croisent jamais.
+   en 25 ms parce qu'ils ne le croisent jamais. crewai était la deuxième
+   contrainte de cette liste — 1,6 s à lui seul, pour exprimer un round qui
+   n'a qu'une branche. Il est parti, et le round complet s'importe
+   maintenant en 0,10 s.
 2. **Les hooks tournent sous le python du système, hors venv, à chaque appel
    d'outil** (~41 ms, dont 21 de démarrage d'interpréteur). D'où :
    `launcher/hooks/**` et le routeur n'importent que la stdlib, et les 7 ms
@@ -45,7 +47,7 @@ core/        le framework : ce qui ne sait rien d'aucun workflow
                       ↓
    core/execution/    la mécanique générique : lancer un stage, le sauter
                       ↓
-   core/adapters/     l'extérieur, emballé : gh, git, le SDK, crewai, le disque
+   core/adapters/     l'extérieur, emballé : gh, git, le SDK, le disque
                       ↓
    core/domain/  core/runtime/    deux feuilles : le vocabulaire, et le support
 ```
@@ -68,7 +70,7 @@ vivent :
 | rien sous `core/` ne connaît `workflows/` ni `launcher/` | que le framework se branche sur son utilisateur |
 | toute couche de `core/` est nommée dans `ALLOWED` | qu'un sous-paquet oublié échappe à toute règle |
 | `execution` n'importe **aucun** `workflows` | que la mécanique se lie à un workflow |
-| crewai et le SDK dans **un seul** fichier chacun | 1,8 s sur le chemin rapide |
+| le SDK dans **un seul** fichier | des secondes sur le chemin rapide |
 | le launcher : stdlib seule au niveau module | que tous les hooks du dépôt cassent |
 | `core/domain/` ne touche ni disque ni subprocess | que le métier cesse d'être testable avec des chaînes |
 | `core/domain/` ne nomme aucun workflow | qu'une instance se range dans le vocabulaire |
@@ -143,7 +145,6 @@ graphe, les binaires, le disque.
 | `agent/base.py` | `AgentRunner` (le port) et `AgentResult` (le résultat neutre) |
 | `agent/claude_sdk.py` | **le seul importeur du SDK** |
 | `agent/progress.py` | le flux de messages rendu lisible : battement, trace |
-| `engine/crewai_engine.py` | **le seul importeur de crewai** : `Flow`, `listen`, `router` |
 | `shell/github.py` | `gh`. Le plus gros fichier du paquet |
 | `shell/binaries.py` | ce qui est sur le PATH — `claude`, `gh` |
 | `shell/{git,notify}.py` | `git`, `osascript` |
@@ -151,8 +152,8 @@ graphe, les binaires, le disque.
 
 **Dépend de** : `domain` et `runtime`.
 **Interdit** : `execution`, `workflows`, `launcher`.
-**Les deux confinements**, assertés : `crewai` n'existe que dans
-`engine/crewai_engine.py`, `claude_agent_sdk` que dans `agent/claude_sdk.py`.
+**Le confinement**, asséré : `claude_agent_sdk` n'existe que dans
+`agent/claude_sdk.py`.
 **Ce qu'il ne fait pas** : `shell/github.py` rend des `Issue` et ne sait pas
 ce qu'une étiquette signifie. `merged_prs(base)` rend les PR mergées ; quelle
 PR *vaut preuve de livraison* est la convention donnée à /code, et se décide
@@ -205,8 +206,8 @@ avec son modèle, son effort et sa prose — plus `INJECTOR`, le nom que le
 préambule cite. `pr_review/stages/` ne porte que la prose : ses deux passes
 tirent leur modèle de `ReviewConfig`, parce qu'ils sont réglables à l'appel.
 
-`agentic_dev_loop/internals/` : `flow` (**le graphe : la séquence se lit
-ici**) · `gates` (ce qu'un **nœud** exige et doit obtenir) · `board` (le côté
+`agentic_dev_loop/internals/` : `round` (**ce qui entoure la séquence —
+la séquence elle-même est dans `stages/`**) · `gates` (ce qu'un **nœud** exige et doit obtenir) · `board` (le côté
 lecture des issues) · `loop` (le budget de rounds) · `state` (l'état
 persisté).
 
@@ -245,10 +246,9 @@ workflow  ──►  contract.sequence  ──►  preconditions ──►  chec
 ```
 
 `settings` est la feuille du workflow : rien dedans ne dépend de `loop` ni de
-`flow`. `state` est séparé de `flow` **exprès** — `flow` importe crewai.
-Mesuré : `import state` = 0,12 s sans crewai, `import flow` = 1,43 s avec.
-Lire l'état persisté ne doit pas payer le moteur. `workflow.py` tient la même
-discipline : son import du round est **tardif**, dans le corps d'`execute()`.
+`round`. `state` est séparé exprès — lire l'état persisté ne doit rien coûter
+d'autre. C'était une nécessité du temps du moteur de graphe (`import state` =
+0,12 s, `import flow` = 1,43 s) ; c'est aujourd'hui de l'hygiène.
 
 **Les `postconditions` des deux workflows sont vides**, et c'est un constat,
 pas un oubli — chaque fichier explique lequel. Le round garantit par round
@@ -266,11 +266,11 @@ journal sont inchangés — ils sont portés par `Status` au lieu d'une classe
 d'exception. Seule `ConfigError` subsiste : une config qui ne se construit
 pas n'a personne à qui rendre un `Result`.
 
-**Le prix, et il est réel** : un nœud de flow qui rend un échec n'arrête pas
-le graphe — le moteur enchaîne. Chaque nœud s'ouvre donc sur
-`if self.state.stopped: return`, et le routeur a une sortie « stop »
-qu'aucun nœud n'écoute. Sans ça, un `/code` qui s'arrête laisserait partir
-`/create-test`. Deux tests l'asserent ; retire une garde, ils tombent.
+**Ça a eu un prix, et il est payé** : un nœud de flow qui rendait un échec
+n'arrêtait pas le graphe — le moteur enchaînait —, donc chaque nœud s'ouvrait
+sur `if self.state.stopped: return` et six membres de `RoundState` portaient
+cet arrêt d'un nœud au suivant. `run_sequence` rend au premier échec : la
+garde et les six membres ont disparu avec le moteur.
 
 ### `launcher/` — les deux protocoles d'entrée
 
@@ -283,7 +283,7 @@ un routeur.
 droit de tout connaître**, parce que c'est elle qui assemble.
 **La contrainte dure** : `main.py`, `routes.py`, `__init__.py` et `hooks/**`
 n'importent que la **stdlib au niveau module**. Le routeur fait ses imports
-**dans la branche du switch**. Sans ça, un hook paierait l'import de crewai à
+**dans la branche du switch**. Sans ça, un hook paierait l'import du SDK à
 chaque appel d'outil — et échouerait, puisqu'il tourne sous le python du
 système.
 `validation.py` ne dépend que de `domain.stage_spec` et `routes` : pas
@@ -317,7 +317,6 @@ construire leur coûterait une lecture d'environnement.
 | **`AgentRunner`** | `default_runner(workspace)`, **à l'appel** dans `session.run` | `Ctx.runner`, ou le défaut si `None` | poser `ctx.runner`, ou remplacer `session.run` |
 | **`Git`** | `preconditions._git(cfg)`, à l'appel | rien — local à la fonction | `Git(root, run=…)` prend son `run` |
 | **la table du pipeline** | par défaut `PIPELINE`, champ de `RunConfig` | `cfg.pipeline` / `cfg.rollover` | `RunConfig(pipeline=…)` |
-| **le moteur de graphe** | `core/adapters/engine/__init__.py` — **la seule ligne du paquet qui nomme une implémentation** | `Flow`, `listen`, `router` importés par `flow.py` | changer cet import |
 
 ### Les trois choses à comprendre absolument
 
@@ -369,9 +368,10 @@ en **fabriquer** un : c'est `hub` qui le fait, pour tout le monde.
   pas pour la testabilité, mais pour éviter une seconde salve d'appels
   d'API par round — et surtout pour éviter que deux lectures ne répondent
   pas la même chose.
-- **crewai** n'est pas injecté : il est *confiné*. Un seul fichier le nomme,
-  et changer de moteur veut dire changer cet import. C'est un choix — pas
-  d'abstraction pour un besoin qui n'existe pas encore.
+- **Le SDK** n'est pas injecté : il est *confiné*. Un seul fichier le nomme.
+  C'est un choix — pas d'abstraction pour un besoin qui n'existe pas encore.
+  Le moteur de graphe avait le même traitement ; il est parti sans que rien
+  d'autre bouge, ce qui est exactement ce que le confinement promettait.
 
 ---
 
@@ -386,7 +386,7 @@ GitHub (issues)                      .llocal/ (cache local, jamais autoritaire)
  board.read() ──► Board ──► tasks.next_task() ──► la task
                                 │
                                 ▼
-      RoundState  ◄──── persisté par crewai après chaque nœud
+      RoundState  ◄──── persisté après chaque étape (resume.save)
                                 │
        business-analyst ──► code ──► create-test
                                 │
@@ -450,7 +450,8 @@ Quatre heures, dans cet ordre, et tu as le paquet :
 4. `core/domain/outcomes/result.py` — comment un arrêt voyage. 10 min.
 5. `core/execution/contract/workflow.py` — la forme que tout workflow a,
    et les quinze lignes de `sequence()`. 15 min.
-6. `workflows/agentic_dev_loop/internals/flow.py` — la séquence. 30 min.
+6. `workflows/agentic_dev_loop/stages/__init__.py` puis
+   `internals/round.py` — la séquence, puis ce qui l'entoure. 20 min.
 7. `workflows/agentic_dev_loop/internals/gates.py` — ce qui prouve. 20 min.
 8. `core/execution/{context,stage_runner,session}.py` — la mécanique. 40 min.
 9. `core/adapters/agent/base.py` puis `claude_sdk.py` — le port et son unique
@@ -496,12 +497,11 @@ autre.
 **e. `gates.task_is_delivered` prend cinq arguments**, dont un `StageSpec`
 qui ne sert qu'à formuler un message d'erreur. Ça sent le paramètre de trop.
 
-**f. `core/adapters/store/resume.py` connaît le schéma sqlite de crewai.**
-Il relit la table `flow_states` que le moteur écrit, en sqlite3 de la stdlib.
-C'est un couplage à une bibliothèque externe **hors de son adaptateur** —
-assumé et documenté, parce que `--status` ne doit pas payer 1,8 s d'import
-pour afficher deux lignes. Le prix à connaître : si crewai change son schéma,
-ça casse ici et nulle part ailleurs.
+**f. ~~`resume.py` connaît le schéma sqlite de crewai.~~ Réglé.**
+Il relisait la table `flow_states` que le moteur écrivait : un schéma connu
+de deux côtés dont un seul était à nous. `resume.save` l'écrit désormais, et
+les colonnes sont restées identiques — un magasin écrit par l'ancien moteur
+se relit sans rien migrer.
 
 **g. `GitHub` n'a pas de port, contrairement à `AgentRunner`.**
 Le moteur d'agent a une interface abstraite et une implémentation ; GitHub a
@@ -529,7 +529,7 @@ le round la laisse ouverte sous `waiting-merge`.
 
 538 tests, dont : les prompts assertés **au bit près** contre des fichiers
 oracle produits par l'ancien shell ; les 7 règles de couches ; le fait que
-`--status`/`--costs` n'importent ni crewai ni le SDK (en exécutant vraiment
+`--status`/`--costs` n'importent pas le SDK (en exécutant vraiment
 la commande) ; qu'aucune variable d'environnement lue par le code ne manque
 d'un épilogue `--help` ; que la table des routes et `validation.py` nomment
 exactement les mêmes règles ; et que deux `Workspace` coexistent sans se
@@ -537,5 +537,5 @@ marcher dessus.
 
 Ce qui n'est **pas** couvert et mérite ton œil : tout ce qui touche
 réellement à `gh` (les tests passent par un double), le comportement réel de
-crewai sur une reprise, et les prompts eux-mêmes — aucun test ne peut dire
+le magasin de reprise sur une reprise, et les prompts eux-mêmes — aucun test ne peut dire
 s'ils sont *bons*, seulement s'ils n'ont pas changé.

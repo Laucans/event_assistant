@@ -170,14 +170,14 @@ import os, sys
 import pipeline.launcher.main as router
 
 assert os.environ.get("ANTHROPIC_API_KEY"), "le routeur a touche a l'environnement"
-assert "crewai" not in sys.modules, "le routeur a importe crewai"
+assert "claude_agent_sdk" not in sys.modules, "le routeur a importe le SDK"
 assert "claude_agent_sdk" not in sys.modules, "le routeur a importe le SDK"
 
 sys.argv = ["agent-loop", "loop", "--costs"]
 router.main()
 
 assert os.environ.get("ANTHROPIC_API_KEY") is None, "la cle a survecu a la route"
-assert "crewai" not in sys.modules, "le chemin rapide a importe crewai"
+assert "claude_agent_sdk" not in sys.modules, "le chemin rapide a importe le SDK"
 assert "claude_agent_sdk" not in sys.modules, "le chemin rapide a importe le SDK"
 print("ROUTER-OK")
 """

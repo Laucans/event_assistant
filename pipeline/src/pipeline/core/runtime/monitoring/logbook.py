@@ -16,7 +16,7 @@ keep writing `log("...")` — a `Logbook` is callable, and calling it means
 INFO, which is what every existing call site meant.
 
 Standard library only: this module sits under `--status` and `--costs`, which
-answer without importing crewai or the SDK.
+answer without importing the agent SDK.
 """
 
 from __future__ import annotations
@@ -115,7 +115,7 @@ def open_logbook(name: str, *, file: Path | None = None, level: int = NORMAL,
     logger = logging.getLogger(name)
     logger.setLevel(level)
     # A package logger that also propagated would print each line twice as
-    # soon as anything configured the root logger — crewai does.
+    # soon as anything configured the root logger — a dependency may.
     logger.propagate = False
     for handler in list(logger.handlers):
         logger.removeHandler(handler)

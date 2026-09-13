@@ -82,7 +82,7 @@ def test_a_round_that_stops_ends_the_run_and_carries_its_reason(
 def test_the_round_context_carries_the_workspace_of_its_config(
         local, hub, monkeypatch, tmp_path):
     """Le workspace descend de la config jusqu'au contexte du round."""
-    from pipeline.workflows.agentic_dev_loop.internals import flow
+    from pipeline.workflows.agentic_dev_loop.internals import round as flow
 
     number, numbers = milestone(hub, ready=(0,), tasks=("Une task",))
     hub.close(numbers[0])

@@ -32,7 +32,7 @@ def test_a_warning_does_not_read_like_an_ordinary_step(tmp_path):
     """The original defect: `print()` made the two identical."""
     log, stream, _ = book(tmp_path)
     log("ordinaire")
-    log.warn("panneaux crewai non desactivables")
+    log.warn("un avertissement")
     info, warn = stream.getvalue().splitlines()
     assert "INFO" in info and "WARN" in warn
 
@@ -92,6 +92,7 @@ def test_the_null_logbook_writes_nowhere(capsys):
 
 
 def test_the_package_logger_does_not_propagate(tmp_path):
-    """crewai configure le logger racine ; sans ca chaque ligne sortirait deux fois."""
+    """Une dependance peut configurer le logger racine ; sans ca chaque ligne
+    sortirait deux fois."""
     log, _, _ = book(tmp_path, name="propagation")
     assert logging.getLogger("propagation").propagate is False

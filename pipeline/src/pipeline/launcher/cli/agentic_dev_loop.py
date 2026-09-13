@@ -1,7 +1,7 @@
 """The loop's command-line entry point.
 
 The fast commands (`--status`, `--costs`) answer without ever importing
-crewai: 2.5s of import to print two lines would be a regression against the
+the agent SDK: seconds of import to print two lines would be a regression
 shell, which answered in 10ms.
 """
 
@@ -20,11 +20,6 @@ from pathlib import Path
 os.environ.pop("ANTHROPIC_API_KEY", None)
 os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
 
-# Set before any crewai import: this pipeline sends no telemetry.
-os.environ.setdefault("CREWAI_DISABLE_TELEMETRY", "true")
-os.environ.setdefault("CREWAI_DISABLE_TRACKING", "true")
-os.environ.setdefault("CREWAI_DISABLE_VERSION_CHECK", "true")
-os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
 from pipeline.core.adapters.shell.notify import notify  # noqa: E402
@@ -67,7 +62,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                "\n"
                "Env overrides: INTEGRATION_BRANCH, PERMISSION_MODE, MAX_ROUNDS,\n"
                "STAGES, MODEL, EFFORT, ALLOW_DIRTY, HEARTBEAT_SECONDS.\n"
-               "PIPELINE_CREWAI_PANELS=1 puts CrewAI's per-method ASCII panels\n"
+
                "back in the journal, for debugging the graph itself.\n"
                "The PR review has knobs of its own: scripts/pr-review --help.\n"
                "\n"
@@ -232,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         log.warn("interrupted")
         return EXIT_INTERRUPTED
     except Exception:
-        # The worst case this exists for: a ValidationError, a crewai internal,
+        # The worst case this exists for: a ValidationError, an SDK internal,
         # a sqlite or an OSError used to escape as a traceback on a stderr
         # nobody kept, and run.log simply stopped mid-round with no reason.
         # It goes into the journal first, and still fails loudly.

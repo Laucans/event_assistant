@@ -100,9 +100,18 @@ class RunConfig(WorkflowConfig):
 
     def enabled(self, stage: StageSpec) -> bool:
         """In the table, and not filtered out by --stages/STAGES."""
+        return self.runs(stage.skill)
+
+    def runs(self, skill: str) -> bool:
+        """Ce skill fait-il partie de ce run ?
+
+        Par nom et non par entree de table : une garde qui veut savoir si le
+        stage qui livre la task a ete ecarte n'a pas a retrouver son
+        `StageSpec` d'abord.
+        """
         if not self.stages:
             return True
-        return stage.skill in self.stages.split()
+        return skill in self.stages.split()
 
     def resolve(self, stage: StageSpec) -> StageSpec:
         """MODEL/EFFORT are the blunt override: one value for the whole run.

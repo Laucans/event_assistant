@@ -15,6 +15,7 @@ import asyncio
 import re
 import io
 import types
+from dataclasses import replace
 
 import pytest
 from conftest import milestone
@@ -24,7 +25,8 @@ from pipeline.workflows.agentic_dev_loop.internals import tasks
 from pipeline.core.execution import session
 from pipeline.workflows.agentic_dev_loop.internals import board
 from pipeline.core.adapters import hub as adapters
-from pipeline.workflows.agentic_dev_loop.internals import flow as flow_mod
+from pipeline.workflows.agentic_dev_loop.internals import round as flow_mod
+from pipeline.workflows.agentic_dev_loop.internals.state import RoundState
 from pipeline.core.runtime.filesystem.workspace import Workspace
 from pipeline.core.runtime.monitoring import logbook
 from pipeline.core.domain.stage_spec import StageSpec
@@ -77,31 +79,39 @@ def prompts_seen(repo, monkeypatch):
 
 
 def rollover(spec):
-    """Une config dont la table enchaine sur ce stage de rollover."""
-    return RunConfig(max_rounds=1, rollover=spec)
+    """Une config dont la table enchaine sur ce stage de rollover.
+
+    La garde de sortie du planner voyage dans l'entree, comme celles des
+    trois etapes : un test qui construit son propre `StageSpec` doit donc la
+    porter aussi. Elle etait ecrite en dur dans le noeud du graphe.
+    """
+    return RunConfig(max_rounds=1,
+                     rollover=replace(spec, after=table.PLANNER_STAGE.after))
 
 
 def halted(tmp_path, cfg=None, resuming=False):
-    """L'arret qu'un round a enregistre — vide s'il est alle au bout.
+    """L'arret qu'un round rend — un succes s'il est alle au bout.
 
-    Un noeud qui s'arrete ne leve plus : il l'ecrit dans l'etat, que le
-    moteur persiste, et c'est la que la boucle le relit apres le kickoff.
+    Un round rend son arret, comme tout le reste du paquet. Il l'ecrivait
+    dans l'etat du temps du graphe : un noeud qui rendait un echec
+    n'arretait rien, le moteur declenchait le suivant, et la raison devait
+    survivre dans l'etat pour etre relue apres le kickoff.
     """
-    return kick(tmp_path, cfg, resuming).state.halt
+    return kick(tmp_path, cfg, resuming).halt
 
 
 def kick(tmp_path, cfg=None, resuming=False):
     """Un round. `resuming=True` monte la forme d'un round repris."""
     cfg = cfg or RunConfig(max_rounds=1)
     ctx = flow_mod.RoundCtx(cfg=cfg, log=logbook.null(), log_dir=tmp_path,
-                        round_no=1, workspace=Workspace(tmp_path))
+                            round_no=1, workspace=Workspace(tmp_path))
     if resuming:
         here = board.read(adapters.gh(ctx.workspace)).value
         here.resuming = here.next
         ctx.board = here
-    flow = flow_mod.build_flow(ctx)()
-    asyncio.run(flow.kickoff_async())
-    return flow
+    st = RoundState(id="test-round")
+    ran = asyncio.run(flow_mod.run(ctx, st))
+    return types.SimpleNamespace(state=st, halt=ran, ctx=ctx)
 
 
 def test_the_stages_run_in_the_documented_order(tmp_path, calls):
@@ -390,27 +400,6 @@ def test_the_analyst_prompt_names_the_issue_it_must_write_into(
     assert f"milestone #{repo.milestone}" in said
 
 
-def test_the_crewai_panels_are_silenced(tmp_path, calls, monkeypatch):
-    """One ASCII frame per method would drown the journal we re-read later."""
-    import crewai_core.printer as printer
-    seen = []
-    monkeypatch.setattr(printer, "set_suppress_console_output",
-                        lambda v: seen.append(v))
-    monkeypatch.delenv("PIPELINE_CREWAI_PANELS", raising=False)
-    kick(tmp_path)
-    assert seen == [True]
-
-
-def test_the_panels_can_be_put_back_for_debugging(tmp_path, calls, monkeypatch):
-    import crewai_core.printer as printer
-    seen = []
-    monkeypatch.setattr(printer, "set_suppress_console_output",
-                        lambda v: seen.append(v))
-    monkeypatch.setenv("PIPELINE_CREWAI_PANELS", "1")
-    kick(tmp_path)
-    assert seen == []
-
-
 def test_every_stage_is_counted_in_the_round_tally(tmp_path, repo, monkeypatch):
     async def measured(stage, cfg, *, round_no, task, extra="", log_dir, log, runner=None):
         if stage.skill == "code":
@@ -421,9 +410,9 @@ def test_every_stage_is_counted_in_the_round_tally(tmp_path, repo, monkeypatch):
 
     monkeypatch.setattr(session, "run", measured)
     ctx = flow_mod.RoundCtx(cfg=RunConfig(max_rounds=1), log=logbook.null(),
-                        log_dir=tmp_path, round_no=1,
-                        workspace=Workspace(tmp_path))
-    asyncio.run(flow_mod.build_flow(ctx)().kickoff_async())
+                            log_dir=tmp_path, round_no=1,
+                            workspace=Workspace(tmp_path))
+    asyncio.run(flow_mod.run(ctx, RoundState(id="t")))
     assert ctx.tally.stages == 3
     assert ctx.tally.cost == pytest.approx(1.0)
     assert set(ctx.tally.by_stage) == {"business-analyst", "code",
@@ -435,20 +424,30 @@ def test_a_filtered_stage_says_so_instead_of_vanishing(tmp_path, repo, calls):
     said = io.StringIO()
     log = logbook.open_logbook("test.flow.skips", stream=said)
     ctx = flow_mod.RoundCtx(cfg=RunConfig(stages="code"), log=log,
-                        log_dir=tmp_path, round_no=1,
-                        workspace=Workspace(tmp_path))
-    asyncio.run(flow_mod.build_flow(ctx)().kickoff_async())
+                            log_dir=tmp_path, round_no=1,
+                            workspace=Workspace(tmp_path))
+    asyncio.run(flow_mod.run(ctx, RoundState(id="t")))
     skipped = [l for l in said.getvalue().splitlines() if "skipped" in l]
     assert any("business-analyst" in l for l in skipped)
     assert any("create-test" in l for l in skipped)
 
 
-def test_a_stage_missing_from_the_pipeline_says_which_one(tmp_path, calls,
-                                                          monkeypatch):
-    """D2 : `next()` sans defaut levait une `StopIteration` nue, en async."""
+def test_a_table_without_code_simply_does_not_run_it(tmp_path, calls,
+                                                     monkeypatch):
+    """La table **est** la sequence : en retirer une entree la retire.
+
+    Ce test en remplace un autre — « PIPELINE has no 'code' entry » —, et
+    c'est le graphe qui rendait ce message necessaire : ses noeuds nommaient
+    les stages en dur, donc la table et lui pouvaient se contredire. Ils ne
+    peuvent plus : ce qui tourne est ce que la table contient.
+
+    Ce qui reste vrai, et c'est le vrai garde-fou : sans /code, rien ne livre
+    la task, et le round le dit plutot que de boucler dessus.
+    """
     without_code = tuple(s for s in table.PIPELINE if s.skill != "code")
     got = halted(tmp_path, RunConfig(max_rounds=1, pipeline=without_code))
-    assert got.failed and re.search("PIPELINE has no 'code' entry", got.reason)
+    assert calls == ["business-analyst", "create-test"]
+    assert got.failed and re.search("nothing marks it delivered", got.reason)
 
 
 def test_a_merged_pr_closing_the_issue_closes_it_when_github_did_not(

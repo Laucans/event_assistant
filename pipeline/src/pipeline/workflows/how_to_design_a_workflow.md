@@ -271,7 +271,7 @@ ne décide rien. C'est la ligne qui a fait monter le contrat dans
 
 ### Le chemin rapide ne paie pas le moteur
 
-crewai coûte ~1,3 s d'import et tire 2331 modules. Si ton workflow charge un
+le SDK d'agent est lourd à importer. Si ton workflow charge un
 moteur, **importe-le tardivement, dans le corps d'`execute()`** — jamais en
 tête de `workflow.py`. C'est ce qui laisse `--status` et `--costs` répondre en
 80 ms, et le préflight échouer avant qu'un flow soit construit.
@@ -341,26 +341,25 @@ de ce test.
 Ceux-là ont déjà coûté quelque chose. Ils sont ici pour que ça n'arrive
 qu'une fois.
 
-**Un nœud de graphe qui rend un échec n'arrête pas le graphe.** Si ton
-workflow exprime sa séquence en flow crewai : le moteur déclenche le nœud
-suivant dès que le précédent rend la main, quelle que soit sa valeur de
-retour. Chaque nœud doit s'ouvrir sur une garde :
+**N'exprime pas ta séquence en graphe.** Celle du round l'a été, et ça a
+coûté trois choses : un moteur à 1,6 s d'import que tout le reste du paquet
+devait ensuite éviter ; un `if state.stopped: return` en tête de **chaque**
+nœud, parce qu'un moteur déclenche le suivant quelle que soit la valeur de
+retour du précédent ; et six membres de l'état qui n'existaient que pour
+porter cet arrêt d'un nœud à l'autre.
+
+Une séquence d'étapes se déclare — `core/execution/steps.py` la fait
+tourner, et elle rend au premier échec :
 
 ```python
-@listen(code)
-async def create_test(self) -> None:
-    if self.state.stopped:
-        return
-    ...
+ROUND = (
+    StageSpec("business-analyst", …, after=gates.spec_is_in_the_issue),
+    StageSpec("code", …, before=gates.code_has_a_spec),
+)
 ```
 
-Sans ça, un stage qui s'arrête laisse partir le suivant — une session payante
-de plus, sur un travail qu'on vient justement de renoncer à livrer. Prévois
-aussi une sortie de routeur qu'aucun nœud n'écoute, pour arrêter net.
-
-Corollaire : si tu enregistres l'arrêt dans un état **persisté**, nettoie-le
-au début du round suivant. Sinon un run repris relit l'arrêt du précédent et
-ne fait plus rien (`RoundState.starts_a_round()`).
+Un graphe ne se paie que si tu as de vraies branches — plusieurs, et qui se
+rejoignent. Le round n'en avait qu'une (`rollover`), et c'est un `if`.
 
 **Une lecture ratée ne se rend jamais en vide.** `[]` se lit « il n'y a plus
 rien à faire », qui est exactement l'entrée qui déclenche un `/planner` — un
@@ -393,7 +392,7 @@ nom de module menteur.
 | `test_a_workflow_never_imports_another_workflow` | remonte ce que tu partages dans `common/` |
 | `test_the_common_package_never_imports_a_workflow` | le contrat s'est mis à connaître un implémenteur |
 | `test_every_layer_only_imports_the_layers_below_it` | un import qui remonte une couche |
-| `test_a_confined_library_appears_in_exactly_one_module` | crewai ou le SDK importé hors de son adaptateur |
+| `test_a_confined_library_appears_in_exactly_one_module` | le SDK importé hors de son adaptateur |
 | `test_every_environment_variable_the_code_reads_is_in_a_help_epilog` | une variable lue et non documentée |
 
 Le scan des workflows exempte `common/` et `legacy/` (`NOT_A_WORKFLOW` dans
@@ -417,8 +416,8 @@ Dans cet ordre, une heure :
 2. `core/domain/outcomes/result.py` — comment un arrêt voyage.
 3. `pr_review/` en entier — c'est le plus petit des deux, et il montre la
    forme complète sans moteur de graphe. **Copie celui-là.**
-4. `agentic_dev_loop/internals/flow.py` — seulement si ton workflow est un
-   graphe. C'est là que vivent les gardes de nœud.
+4. `core/execution/steps.py` puis `agentic_dev_loop/stages/__init__.py` —
+   comment une séquence se déclare, et à quoi ressemble une vraie.
 5. `common/checks.py` — les portes que tu ne réécriras pas.
 
 `pipeline/TOUR.md` §2 et §3 donnent les couches et le sens des dépendances ;

@@ -8,8 +8,8 @@ tables que rend `--costs` vivent dans `cli.reports` : un schema qu'on fait
 evoluer et une colonne qu'on aligne ne se relisent pas pour les memes
 raisons.
 
-Bibliotheque standard uniquement : `--costs` ne doit pas payer l'import de
-crewai.
+Bibliotheque standard uniquement : `--costs` ne doit payer l'import de rien
+de lourd.
 """
 
 from __future__ import annotations

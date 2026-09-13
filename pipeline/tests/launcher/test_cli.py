@@ -180,14 +180,13 @@ import sys
 sys.argv = ["agent-loop", "%s"]
 from pipeline.launcher.cli import agentic_dev_loop as loop
 loop.main()
-assert "crewai" not in sys.modules, "le chemin rapide a importe crewai"
 assert "claude_agent_sdk" not in sys.modules, "le chemin rapide a importe le SDK"
 print("FAST-OK")
 """
 
 
 @pytest.mark.parametrize("flag", ["--status", "--costs"])
-def test_the_fast_paths_never_import_crewai_or_the_sdk(flag):
+def test_the_fast_paths_never_import_the_sdk(flag):
     r = subprocess.run([sys.executable, "-c", FAST_PATH % flag],
                        capture_output=True, text=True, cwd=str(ROOT))
     assert "FAST-OK" in r.stdout, r.stderr
@@ -342,7 +341,7 @@ def test_each_way_of_stopping_has_its_own_code_and_its_own_word(
 
 @pytest.mark.parametrize("exc", [
     OSError(28, "No space left on device"),
-    ValueError("un crewai interne"),
+    ValueError("un interne du SDK"),
     RuntimeError("sqlite3 est parti"),
 ])
 def test_an_unexpected_error_reaches_the_run_log_instead_of_stderr(
@@ -418,7 +417,7 @@ def env_knobs() -> set[str]:
 
 
 def test_every_environment_variable_the_code_reads_is_in_a_help_epilog(capsys):
-    """D6 : `PIPELINE_CREWAI_PANELS` et les six `PR_REVIEW_*` n'etaient nulle part."""
+    """D6 : six `PR_REVIEW_*` etaient lues et documentees nulle part."""
     from pipeline.launcher.cli import pr_review as review
 
     documented = ""
@@ -432,8 +431,7 @@ def test_every_environment_variable_the_code_reads_is_in_a_help_epilog(capsys):
 
 def test_the_knob_scan_actually_finds_something():
     """A scan that finds nothing would make the test above vacuous."""
-    assert {"MAX_ROUNDS", "PIPELINE_CREWAI_PANELS", "PR_REVIEW_BRIEF_EFFORT"} <= (
-        env_knobs())
+    assert {"MAX_ROUNDS", "STAGES", "PR_REVIEW_BRIEF_EFFORT"} <= env_knobs()
 
 
 def test_a_broken_environment_variable_is_named_instead_of_traced(
