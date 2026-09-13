@@ -2,7 +2,7 @@
 
 État : **fait le 2026-09-09.** Le code vit dans `pipeline/` ; les deux
 scripts shell sont supprimés. Ce document reste la trace des décisions et
-de la preuve d'équivalence — voir `pipeline/README.md` pour l'usage et `pipeline/INTERNALS.md` pour les rouages.
+de la preuve d'équivalence — voir `pipeline/README.md` pour l'usage et `pipeline/ARCHITECTURE.md` pour les rouages.
 
 ## Décisions prises
 

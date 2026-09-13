@@ -58,7 +58,7 @@ def test_every_workflow_has_a_config_in_the_table():
 
 @pytest.mark.parametrize("name", NAMES)
 def test_every_workflow_declares_a_blueprint(name):
-    """La forme promise par `how_to_design_a_workflow.md`, en assertion."""
+    """La forme promise par `workflows/ARCHITECTURE.md`, en assertion."""
     blueprint = dict(blueprints())[name]
     assert isinstance(blueprint, design.Blueprint)
     assert blueprint.name, "un workflow sans nom n'a pas de commande"
