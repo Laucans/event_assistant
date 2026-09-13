@@ -10,6 +10,12 @@ le PATH, `gh` authentifie, un arbre de travail propre, une branche qui existe
 qu'elle depend de `gh` autant que la boucle. Un workflow compose la liste qui
 le concerne ; ce qui lui est propre reste chez lui.
 
+Ce qu'une porte **est** — `Check`, `Checked`, `verify_all` — a rejoint
+`core/execution/contract/gate.py` : c'est la forme d'un preflight, et le
+framework doit pouvoir la nommer sans importer un workflow. Ce qui reste ici
+est la politique : quelles portes, et dans quel ordre. Les trois noms sont
+reexportes, parce que c'est d'ici qu'un workflow les lit.
+
 **Une porte ne rend jamais None** : elle rend un `Result`, en echec avec la
 phrase sur laquelle un humain agit, ou en succes. Aucun appel externe n'est
 fait ici — `adapters.shell` les porte tous.
@@ -20,55 +26,25 @@ moteur, et doit pouvoir echouer sans l'avoir charge.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Protocol
 
 from pipeline.core.adapters.shell import binaries
 from pipeline.core.domain.outcomes.result import Result
-from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.core.execution.contract.gate import Check, Checked, verify_all
 from pipeline.core.runtime.monitoring.logbook import Logbook
 from pipeline.core.adapters import hub
 
-
-class Checked(Protocol):
-    """Le minimum qu'une porte commune lit dans une config de workflow."""
-
-    workspace: Workspace
+__all__ = ["Check", "Checked", "verify_all", "BranchChecked", "TOOLING",
+           "BRANCH", "claude_on_path", "gh_on_path", "gh_authenticated",
+           "integration_branch_exists", "on_the_integration_branch",
+           "branch_is_on_origin", "ci_triggers_on_the_branch",
+           "working_tree_is_clean"]
 
 
 class BranchChecked(Checked, Protocol):
     """Ce que les portes de branche lisent en plus."""
 
     integration_branch: str
-
-
-@dataclass(frozen=True)
-class Check:
-    """Une porte : un nom pour la nommer, et ce qu'elle verifie.
-
-    Le nom est la pour qu'un lecteur liste ce qui est verifie sans lire les
-    corps — et pour qu'une passe d'observabilite ait quelque chose a
-    journaliser quand chacune passe.
-    """
-
-    name: str
-    verify: Callable[[Checked, Logbook], Result[None]]
-
-
-def verify_all(checks: tuple[Check, ...], cfg: Checked,
-               log: Logbook) -> Result[None]:
-    """Les portes, dans l'ordre, jusqu'a la premiere qui echoue.
-
-    S'arreter a la premiere est le comportement voulu : les portes se
-    supposent les unes les autres — demander a `gh` quelles etiquettes existe
-    n'a pas de sens tant qu'on ne sait pas s'il est authentifie.
-    """
-    for check in checks:
-        got = check.verify(cfg, log)
-        if got.failed:
-            return got
-    return Result.of(None)
 
 
 # --- les portes, une fonction chacune --------------------------------------
