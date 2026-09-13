@@ -6,7 +6,8 @@ regles de saut de la revue, et le tableau d'issues, sans PR ni depot reels.
 
 Rien ici ne decide : lire une PR, lire ses commentaires, en poster un, lire
 une issue, en creer une, la relier. Ce qu'on fait de la reponse appartient a
-`workflows.pr_review.flow` et a `workflows.agentic_dev_loop.board`.
+`workflows.pr_review.internals.review` et a
+`workflows.agentic_dev_loop.internals.board`.
 
 Chaque appel nomme le depot, comme le faisait le `cd "$(git rev-parse
 --show-toplevel)"` de `pr-review.sh` : `gh` resout la PR depuis son

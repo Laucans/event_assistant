@@ -2,12 +2,12 @@
 
 A ne pas confondre avec les `preconditions`/`postconditions` de la racine :
 celles-la sont celles du **workflow**, verifiees une fois avant et apres le
-run, et tout workflow en a. Celles-ci sont celles d'un **noeud du graphe** —
+run, et tout workflow en a. Celles-ci sont celles d'une **etape du round** —
 elles n'ont de sens qu'ici, dans le round, et c'est pourquoi elles vivent
 avec lui.
 
-Aucune ne leve : chacune rend un `Result` que le noeud propage. C'est ce qui
-rend visible, dans `flow.py`, l'endroit exact ou le round s'arrete — et ce
+Aucune ne leve : chacune rend un `Result` que l'etape propage. C'est ce qui
+rend visible, dans `stages/`, l'endroit exact ou le round s'arrete — et ce
 qui garantit qu'un stage suivant n'est pas paye apres.
 """
 

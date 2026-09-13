@@ -3,7 +3,7 @@
 Le paquet appelait le SDK d'Anthropic directement : les appelants lisaient
 `result.total_cost_usd`, `result.api_error_status`, `result.num_turns` — des
 noms de champs qui appartiennent a un fournisseur. Changer de moteur aurait
-demande de changer `session.py` et `review.py` avec.
+demande de changer `session.py` et `passes.py` avec.
 
 Ce que le reste du paquet voit desormais, c'est `AgentRunner.run()` qui rend
 un `AgentResult`. Un fournisseur qui n'aurait ni la notion de cout, ni celle
