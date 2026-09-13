@@ -7,7 +7,7 @@ Les raisons derrière chaque règle sont dans les `ARCHITECTURE.md`. Elles ne
 sont pas répétées ici — ce fichier est la surface d'action, pas la carte.
 
 Portée : `pipeline/` uniquement. Le produit (`src/`, TypeScript) suit
-`CLAUDE.md` et `ONBOARDING.md`.
+`CLAUDE.md`.
 
 ---
 
@@ -368,6 +368,5 @@ time pipeline/.venv/bin/python -m pipeline.launcher loop --status
 | `src/pipeline/launcher/ARCHITECTURE.md` | routage, protocoles, codes de sortie |
 | `CONTRIBUTION.md` | ce fichier : où écrire, ce qui est interdit, ce qui le prouve |
 | `../CLAUDE.md` | les règles du dépôt entier, produit compris |
-| `../ONBOARDING.md` | la prise en main humaine du dépôt |
 
 Le détail est dans le code. Ces documents ne le paraphrasent pas.
