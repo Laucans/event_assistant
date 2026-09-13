@@ -175,6 +175,107 @@ binaries.shutil                             # PATH ; résolu à l'appel
 
 - Les workflows sont découverts, pas listés. Un troisième est vérifié sans intervention.
 
+## `agentic_dev_loop`
+
+- Forme `Repeat`. Une task par round, `MAX_ROUNDS` rounds au plus.
+- Table : `/business-analyst` → `/code` → `/create-test`.
+- `/code` ouvre sur `/tech-analyst` : le plan n'est écrit dans aucun fichier.
+- Un processus neuf le jetterait. D'où `lead` sur l'entrée de table.
+
+| Module | Porte |
+| --- | --- |
+| `internals/tasks.py` | le modèle en issues. Métier pur, ni I/O ni réseau |
+| `internals/board.py` | le côté lecture : milestone, sous-issues, bloqueurs |
+| `internals/round.py` | un round : choisir, faire tourner, constater |
+| `internals/loop.py` | l'unité que `Repeat` répète. Reprise, comptabilité |
+| `internals/state.py` | `RoundState`, pydantic. Ce qu'une reprise retrouve |
+| `internals/gates.py` | ce qu'une étape exige et doit obtenir |
+| `stages/` | la table `PIPELINE`, `INJECTOR`, et un module de prose par stage |
+| `stages/business_analyst.py`, `code.py`, `planner.py` | les consignes propres à chaque stage |
+
+### Les sept étiquettes
+
+```
+pipeline:roadmap        un item de roadmap, source d'un milestone
+pipeline:milestone      un milestone ; ses sous-issues sont les tasks
+pipeline:agent          une task que la boucle peut faire
+pipeline:human          une task que seul l'humain peut faire
+pipeline:ready          l'humain autorise celle-ci. Personne d'autre ne la pose
+pipeline:spec-written   le SPEC est dans le corps de l'issue
+pipeline:waiting-merge  livrée sur la branche d'intégration, pas dans main
+```
+
+- Créées à la main. Le préflight vérifie qu'elles existent avant de payer.
+- Une étiquette mal orthographiée rend le tableau vide, et vide déclenche `/planner`.
+
+### Les quatre règles de choix
+
+1. Le milestone courant est le `pipeline:milestone` ouvert de plus petit numéro.
+2. La task suivante : ouverte, `pipeline:agent`, `pipeline:ready`, pas `waiting-merge`.
+   Sous-issue du milestone courant, et tous ses `blocked_by` fermés.
+3. `pipeline:human` n'est pas un mécanisme à part. Elle bloque via `blocked_by`.
+4. `pipeline:ready` commande tout. Une task non prête arrête le run.
+
+- Un ordre total, pas « l'issue N-1 est-elle fermée ». Le parallélisme est prévu.
+- Un bloqueur en `waiting-merge` ne bloque plus : son code est sur la branche.
+- Sans cette exception, la chaîne s'arrêterait après une seule task.
+- Une task non prête ne fait **pas** basculer en rollover. Confondre coûte un run opus.
+
+### Livrée
+
+```python
+CLOSES = r"^[ \t]*(?:closes|fixes|resolves)[ \t]+#(\d+)[ \t]*$"
+```
+
+- Plus strict que GitHub, qui accepte le mot-clé n'importe où dans le corps.
+- Lire plus large fermerait une issue sur une phrase qui la mentionne.
+- GitHub ne ferme une issue liée qu'au merge dans la branche **par défaut**.
+- La boucle merge dans `INTEGRATION_BRANCH`. Elle pose donc `waiting-merge`.
+- L'issue reste ouverte, n'est plus jamais choisie, ne bloque plus la suivante.
+
+### `Board`
+
+- `read(gh)` compose : milestone courant → sous-issues → bloqueurs.
+- Échoue plutôt que de rendre un tableau vide. Vide se lit « milestone fini ».
+- Lu une fois par round, passé dans le contexte. Évite une seconde salve d'API.
+- `stuck()` distingue deux blocages : tout livré en attente de fusion, ou aucun `ready`.
+- Les deux appellent des gestes différents. Les confondre laisse l'humain sans consigne.
+
+## `pr_review`
+
+- Forme `Once`. Deux passes payantes, puis la publication.
+- Consultative : ne bloque rien, ne merge rien, ne touche aucune branche.
+- La boucle peut merger la PR pendant que la revue s'écrit.
+
+| Module | Porte |
+| --- | --- |
+| `internals/skip_rules.py` | quelles PR ne sont pas revues |
+| `internals/review.py` | pré-contrôle, verrou, phrase de fin |
+| `internals/pr.py` | les cinq champs qu'une revue lit d'une PR |
+| `internals/notes.py` | le texte publié : marqueur, pied de page |
+| `internals/publish.py` | l'étape de publication |
+| `internals/gates.py` | `--no-inline`, dry-run, tolérance de la passe 1 |
+| `stages/brief.py` | le prompt des notes de synthèse |
+
+### Les quatre règles de saut
+
+1. La PR ne cible pas la branche d'intégration.
+2. La PR est un brouillon.
+3. La branche source commence par `test/`.
+4. Un commentaire porte déjà le marqueur `<!-- agent-review -->`.
+
+- `--force` les lève toutes.
+- Règle 3 : une revue par task, pas par PR. `/code` et `/create-test` ouvrent chacun une PR.
+- Revoir celle des tests reverrait deux fois le même changement.
+- Le texte publié reste en français : il s'adresse à un humain francophone.
+
+## `legacy/`
+
+- `migration.py` : le markdown du pipeline, traduit en issues. Métier pur.
+- `migrate.py` : l'exécution de cette traduction, une fois.
+- Idempotent, et ne pose jamais `pipeline:ready`.
+- Meurt entier le jour où plus personne n'en a besoin.
+
 ## Ajouter un workflow
 
 1. Copier `pr_review/` — le plus petit, il montre la forme complète.

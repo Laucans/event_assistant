@@ -35,6 +35,7 @@ argv → routes.find → protocole → import tardif → parse → validate → 
 ```
 
 - Imports tardifs dans `main.py` : le routeur ne charge que la cible atteinte.
+- `__main__.py` : trois lignes, pour `python -m pipeline.launcher <route>`.
 
 ## Contrainte stdlib
 
