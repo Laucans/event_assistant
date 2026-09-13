@@ -5,13 +5,14 @@ description: Add the test coverage one completed /code round actually warrants �
 
 # Role: Test Author
 
-You take one completed `/code` round — the SPEC that just shipped — and
-add the tests it warrants: scope the round, triage it file by file, write
-only tests that catch a real regression, prove each can fail, land a PR.
+You take one completed `/code` round — the task whose SPEC just shipped —
+and add the tests it warrants: scope the round, triage it file by file,
+write only tests that catch a real regression, prove each can fail, land a
+PR.
 
-You do **not** implement features (`/code`), write specs (`/analyst`), or
-archive (`/archive-instructions`). You may fix a bug a new test exposes
-when the fix is a line or two; anything larger is a finding you report.
+You do **not** implement features (`/code`) and do **not** write specs
+(`/business-analyst`). You may fix a bug a new test exposes when the fix is
+a line or two; anything larger is a finding you report.
 
 **"If necessary" is the whole skill.** Concluding that nothing in the
 round warrants a test — with the reasoning shown per file — is a
@@ -20,10 +21,11 @@ successful run. A test written to look busy asserts nothing, forever.
 ## 1. Read first
 
 - `.claude/skills/code/SKILL.md` — what the round you follow did.
-- `docs/current/SPEC.md` — the round's contract; its `Edge cases` and
-  `Verification` sections name most of what is worth testing. Once
-  `/archive-instructions` has filed it, read the newest task folder under
-  `docs/archives/milestones/` instead.
+- **The task issue body** — the round's contract; its `Edge cases` and
+  `Verification` sections name most of what is worth testing. In a loop run
+  it is already in your prompt under `SCOPE`; otherwise `gh issue view <n>`.
+  The issue is closed by now — that is what "the round shipped" means, not a
+  sign you have the wrong one.
 - `tests/smoke.test.ts` (the only test, and the convention) and
   `vitest.config.mts`, whose `include` is
   `{src,tests}/**/*.{test,spec}.?(c|m)[jt]s?(x)`: colocated tests under
@@ -39,9 +41,10 @@ Resolve what "the last `/code` round" changed, in this order, and state
 which method answered before touching anything.
 
 1. **Branch still open** — `git diff main...HEAD --stat` is the round.
-2. **Already merged** (the normal `/code` ending) —
-   `gh pr list --state merged --limit 1`, then `gh pr diff <n>
-   --name-only`.
+2. **Already merged** (the normal `/code` ending) — the round's PR is the
+   one whose body carries `Closes #<issue>`:
+   `gh pr list --state merged --limit 5 --json number,title,body`, then
+   `gh pr diff <n> --name-only`.
 3. **Cross-check** against the SPEC's `Files & interfaces touched`; a
    file in the diff the spec never named is worth a sentence either way.
 
@@ -148,7 +151,7 @@ per `/commit`, then `gh pr create`, `gh pr checks`, `gh pr merge --rebase`.
   proven otherwise. Fix the test; never loosen an assertion to pass.
 - **A new test exposes a real bug.** Report it, keep the failing test
   (`CLAUDE.md`, Workflow), fix only if the fix is a line or two inside the
-  round's scope — otherwise it is the next `/analyst` item.
+  round's scope — otherwise it is the next `/business-analyst` item.
 - **The code under test needs a devDependency the repo lacks.** Stop and
   ask (section 4). Do not install.
 - **`tests/smoke.test.ts` once real coverage exists.** Its comment says to
@@ -167,8 +170,8 @@ End by telling the user:
 - the triage verdict per file, including everything left untested and why;
 - each test added and the specific regression it would catch;
 - the red-then-green proof output, or why a red proof was not run;
-- the merged PR and every gate result from section 6;
-- that `/archive-instructions` is still theirs if the round is not filed.
+- the merged PR and every gate result from section 6.
 
-This skill never ticks `docs/current/HUMAN_ACTION_TRACKING.md` and never
-archives.
+This skill never touches the task's issue — not its body, not its labels,
+not its state. The task was already closed by `/code`'s PR; your tests ride
+on a PR of their own.

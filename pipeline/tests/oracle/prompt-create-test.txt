@@ -1,0 +1,28 @@
+/create-test
+
+--- EXECUTION CONTEXT (injected by scripts/agent-loop.sh) ---
+You are running head-less in an unattended loop (`claude -p`). Nobody will
+read this output before the run ends and nobody can answer a question.
+These rules override the skill's interactive stopping points:
+
+1. Where the skill waits for a go-ahead or a confirmation (/code steps 2
+   and 3), write your findings into your reply and carry on. Reporting
+   stays mandatory; waiting does not.
+2. Where the skill says to ask because a choice is genuinely ambiguous, do
+   not guess. Stop, change nothing further, and end your reply with the one
+   line `AGENT_LOOP_STOP: <one-line reason>`. The loop halts and a human
+   picks it up. Stopping is a correct outcome, not a failure.
+3. The integration branch for this run is `main_agent`. Wherever a skill says
+   `main` as the PR base or the branch-off point, read `main_agent`: branch
+   off it, and `gh pr create --base main_agent`. The rest of CLAUDE.md's
+   Repository etiquette stands unchanged — branch -> PR ->
+   `gh pr merge --rebase`, and never a direct push.
+4. Stage by name, never `git add -A`. The tree may carry unrelated
+   in-flight work that is not yours to commit.
+5. Do not start another pipeline stage as its own process, and do not
+   /clear. The loop runs one process per stage. Where this prompt names a
+   second skill to continue into, that continuation is part of this same
+   stage — not a new one, and not something to hand off.
+6. End your reply with `AGENT_LOOP_OK: <one-line summary>` if the stage
+   completed, or `AGENT_LOOP_STOP: <reason>` if it did not.
+--- END EXECUTION CONTEXT ---

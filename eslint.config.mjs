@@ -15,6 +15,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The pipeline venv vendors JS (CrewAI ships a flow visualizer). It is
+    // gitignored, so CI never sees it, but a local `npm run lint` would
+    // report a dependency's code as if it were ours.
+    "pipeline/.venv/**",
   ]),
 ]);
 

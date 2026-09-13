@@ -1,0 +1,6 @@
+stage                  ran on             total $  runs     avg $
+code                   opus/high           0.9814     1    0.9814
+create-test            sonnet/high         0.6460     1    0.6460
+archive-instructions   haiku/low           0.1537     1    0.1537
+analyst                opus/high           1.8546     1    1.8546
+ALL                                        3.6357     4
