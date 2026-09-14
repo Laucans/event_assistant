@@ -27,13 +27,16 @@ MIGRATE_UNUSED = (("--rounds", "rounds", None), ("--stages", "stages", None),
 REVIEW_EFFORTS = (("PR_REVIEW_INLINE_EFFORT", "inline_effort"),
                   ("PR_REVIEW_BRIEF_EFFORT", "brief_effort"))
 
-# Les six stages du raffinage, et la variable qui regle l'effort de chacun.
+# Les stages du raffinage, et la variable qui regle l'effort de chacun.
+# L'exploration en fait partie bien qu'elle ne soit pas dans la table : elle
+# est le prologue, et un effort inconnu y leverait au meme endroit.
 REFINEMENT_EFFORTS = (("REFINEMENT_GOAL_EFFORT", "goal_effort"),
                       ("REFINEMENT_TECHNICAL_EFFORT", "technical_effort"),
                       ("REFINEMENT_CRITERIA_EFFORT", "criteria_effort"),
                       ("REFINEMENT_RULES_EFFORT", "rules_effort"),
                       ("REFINEMENT_PLAN_EFFORT", "plan_effort"),
-                      ("REFINEMENT_ROUTER_EFFORT", "router_effort"))
+                      ("REFINEMENT_ROUTER_EFFORT", "router_effort"),
+                      ("REFINEMENT_EXPLORE_EFFORT", "explore_effort"))
 
 EFFORTS = "|".join(stage_spec.EFFORTS)
 

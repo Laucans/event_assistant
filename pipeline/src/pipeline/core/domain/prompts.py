@@ -22,6 +22,8 @@ Le preambule exige `AGENT_LOOP_OK:` en fin de reponse et
 contrat, et un test exige qu'elles nomment la meme chaine.
 """
 
+import re
+
 # Le nom cite dans le preambule quand l'appelant n'en donne pas d'autre.
 # Ancienne valeur : "scripts/agent-loop.sh", qui nommait le script. Un
 # workflow passe le sien, declare a cote de sa table ; ce defaut est
@@ -69,6 +71,22 @@ def fill(template: str, **values: str) -> str:
     for name, value in values.items():
         template = template.replace("{" + name + "}", value)
     return template
+
+
+def splice(template: str, **untrusted: str) -> str:
+    """Substitue ces champs en une seule passe.
+
+    `fill` remplace l'un apres l'autre : un `{body}` ecrit dans le `--context`
+    d'un humain, ou un `{additional_context}` present dans le corps de
+    l'issue, se ferait remplacer par la passe suivante. Ces valeurs-la ne
+    viennent pas de nous, donc elles entrent ensemble.
+
+    Ici et plus dans le raffinage : la carte du depot est du texte de modele
+    qui cite les fichiers du depot — elle porte donc litteralement les `{body}`
+    et `{num}` des templates qu'elle a lus.
+    """
+    pattern = re.compile("|".join(rf"\{{{name}\}}" for name in untrusted))
+    return pattern.sub(lambda m: untrusted[m.group(0)[1:-1]], template)
 
 
 def preamble(branch: str, injector: str = INJECTOR) -> str:

@@ -11,11 +11,10 @@ section a son modele, et les six sont reglables a l'appel.
 
 from __future__ import annotations
 
-import re
-
 from pipeline.core.domain import prompts
 from pipeline.core.domain.action import Action
 from pipeline.core.domain.stage_spec import StageSpec
+from pipeline.workflows.common import stages as common
 from pipeline.workflows.refinement.internals import gates, publish, sections
 from pipeline.workflows.refinement.stages.acceptance_criteria import (
     ACCEPTANCE_CRITERIA_PROMPT)
@@ -57,8 +56,15 @@ KNOBS: dict[str, tuple[str, str]] = {
 
 
 def passes(cfg) -> tuple:
-    """Le routeur, les cinq sections, puis la publication — dans l'ordre."""
+    """La carte, le routeur, les cinq sections, la publication — dans l'ordre.
+
+    Les deux entrees de tete etablissent ce que les six suivantes lisent :
+    une lecture gratuite du depot, puis la session qui la condense. Elles sont
+    **dans la table** parce que la table est la sequence — et parce que leur
+    sortie voyage par `ctx.results`, comme celle du routeur.
+    """
     table: list = [
+        *common.entries(cfg),
         StageSpec(ROUTER, cfg.router_model, cfg.router_effort,
                   skip=gates.router_is_off,
                   after=gates.router_named_sections),
@@ -84,20 +90,24 @@ def additional_context(text: str) -> str:
             "--- end additional_context ---")
 
 
-def splice(template: str, **untrusted: str) -> str:
-    """Substitue ces champs en une seule passe.
-
-    `prompts.fill` remplace l'un apres l'autre : un `{body}` ecrit dans le
-    `--context` d'un humain, ou un `{additional_context}` present dans le
-    corps de l'issue, se ferait remplacer par la passe suivante. Ces deux
-    valeurs-la ne viennent pas de nous, donc elles entrent ensemble.
-    """
-    pattern = re.compile("|".join(rf"\{{{name}\}}" for name in untrusted))
-    return pattern.sub(lambda m: untrusted[m.group(0)[1:-1]], template)
-
-
 def prompt_of(step, ctx, state) -> str:
-    """Le texte de cette etape."""
+    """Le texte de cette etape.
+
+    L'exploration a le sien : elle ne travaille pas une section du corps, elle
+    etablit ce que les six suivantes liront. `ground` ne passe pas par ici —
+    c'est une etape locale, et une etape locale n'a pas de prompt.
+
+    La carte prefixe le texte de chaque section, elle n'est **pas** un champ
+    substitue dans le template : un `{repo_context}` que six templates
+    portaient chacun se serait tu en silence si l'un l'avait perdu, la ou un
+    prefixe ne peut pas manquer. C'est aussi la forme qu'a deja
+    `prompts.build` pour le bloc EXECUTION CONTEXT de la boucle — la carte est
+    ce meme genre de bloc, pas un ingredient d'un prompt de section. Et en
+    tete, identique dans les six : c'est ce qui donne aux six sessions un
+    prefixe de cache commun, que le placer par template aurait casse.
+    """
+    if step.skill == common.SKILL:
+        return common.prompt(ctx, state)
     cfg, issue = ctx.cfg, state.issue
     template = (ROUTER_PROMPT if step.skill == ROUTER
                 else PROMPTS[step.skill])
@@ -106,10 +116,14 @@ def prompt_of(step, ctx, state) -> str:
         num=str(cfg.issue),
         round=str(state.round_no),
         keys="\n".join(sections.KEYS))
-    # Le titre vient de l'issue lui aussi : il entre avec les deux autres.
-    return splice(
+    # Le titre vient de l'issue lui aussi : il entre avec les autres. Pas la
+    # carte du depot : elle cite des fichiers du depot, donc elle porte les
+    # `{body}` et `{num}` des templates qu'elle a lus, et une substitution
+    # l'y ferait rentrer — elle prefixe apres coup, en dehors de la passe.
+    said = prompts.splice(
         said,
         title=issue.title if issue is not None else "",
         additional_context=additional_context(cfg.context),
         body=((issue.body.strip() if issue is not None else "")
               or prompts.EMPTY_BODY))
+    return common.repo_context(ctx) + "\n\n" + said

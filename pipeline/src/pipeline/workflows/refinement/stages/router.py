@@ -22,8 +22,7 @@ that cannot stay consistent once those change — a changed Business Goal
 usually drags the Acceptance Criteria with it, a changed Technical section
 usually drags the Technical Implementation Plan. Name nothing else: a section
 nobody asked about is better left alone. If the request is broad enough to
-touch everything, naming all five is a correct answer. Read the repository if
-you need to tell whether a section is affected.
+touch everything, naming all five is a correct answer.
 
 Answer with the section keys alone, one per line, spelled exactly as listed
 above. No numbering, no bullets, no headings, no explanation, no empty answer

@@ -2,7 +2,8 @@
 
 Ce qui est commun a toute config de workflow vient de `WorkflowConfig`. Ce
 qui reste ici est ce que le raffinage seul connait : l'issue, le contexte du
-round, et le modele de chacun des six stages. Les defauts d'environnement
+round, et le modele de chacune des sessions qu'un round peut payer — les six
+de la table, et l'exploration qui les precede. Les defauts d'environnement
 sont lus par le point d'entree, pas ici.
 """
 
@@ -25,18 +26,23 @@ class RefinementConfig(WorkflowConfig):
     issue: int
     context: str = ""
     force: bool = False
-    goal_model: str = "opus"
+    goal_model: str = "sonnet"
     goal_effort: str = "high"
-    technical_model: str = "opus"
+    technical_model: str = "sonnet"
     technical_effort: str = "high"
     criteria_model: str = "sonnet"
     criteria_effort: str = "high"
-    rules_model: str = "opus"
+    rules_model: str = "sonnet"
     rules_effort: str = "high"
-    plan_model: str = "opus"
+    plan_model: str = "sonnet"
     plan_effort: str = "high"
     router_model: str = "sonnet"
     router_effort: str = "low"
+    # L'exploration qui precede la sequence. Sonnet a dessein : elle lit et
+    # elle condense contre des documents qu'on lui a deja colles, ce n'est pas
+    # un probleme de raisonnement.
+    explore_model: str = "sonnet"
+    explore_effort: str = "high"
     # Le round courant, pose par le precontrole : il nomme les artefacts et
     # la ligne de registre.
     round_no: int = 0

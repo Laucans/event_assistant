@@ -27,10 +27,6 @@ above it: a criterion nothing in this issue asks for does not belong here.
 
 {additional_context}
 
-Ground what you write in the repository rather than guessing: docs/PROJECT.md
-and docs/ARCHITECTURE.md carry the product and the design, and the existing
-code and tests show what "unchanged" means here. Read whatever you need.
-
 Output the content of the section and nothing else: no `## Acceptance
 Criteria` heading, no preamble, no closing remark, no code fence wrapped
 around the whole answer. One rule on the markdown inside it: never write a

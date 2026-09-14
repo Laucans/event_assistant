@@ -220,7 +220,8 @@ def test_a_human_task_is_specified_from_the_end_of_round_one(hub, ws, round_no):
 # Rien n'appelle `gh` ni `claude` : le depot est sur papier, et le moteur
 # d'agent est un double scriptable branche la ou une session se construit.
 
-MARKS = (("You are routing", "router"),
+MARKS = (("You are establishing the map", "explore"),
+         ("You are routing", "router"),
          ("**Technical Implementation Plan**", "technical-plan"),
          ("**Business Goal**", "business-goal"),
          ("**Technical** section", "technical"),
@@ -240,25 +241,33 @@ def stage_of(prompt: str) -> str:
 def engine(monkeypatch):
     """Les sessions payantes, remplacees la ou elles se construisent."""
     ran: list[str] = []
+    prompts: list[str] = []
     script: dict[str, str] = {}
+    state = types.SimpleNamespace(ran=ran, prompts=prompts, script=script,
+                                  fails_on="")
 
     class Engine:
         async def run(self, prompt, *, model, effort, permission_mode,
                       progress=None):
             skill = stage_of(prompt)
             ran.append(skill)
-            return AgentResult(text=script.get(skill, f"le {skill}"),
+            prompts.append(prompt)
+            failed = skill == state.fails_on
+            return AgentResult(text="" if failed else script.get(
+                                   skill, f"le {skill}"),
+                               is_error=failed, subtype="error" if failed
+                               else "success",
                                session_id="sess-1", cost_usd=0.0,
                                duration_ms=1.0, turns=1,
                                usage={"input_tokens": 1, "output_tokens": 1},
                                raw={"result": "ok"})
 
     monkeypatch.setattr(session_mod, "default_runner", lambda ws: Engine())
-    return types.SimpleNamespace(ran=ran, script=script)
+    return state
 
 
 @pytest.fixture
-def refined(ws, hub, engine, monkeypatch):
+def refined(ws, hub, repo, engine, monkeypatch):
     """Un `scripts/refinement` qui n'appelle rien : ni `gh`, ni `claude`."""
     monkeypatch.setattr(binaries, "shutil",
                         types.SimpleNamespace(which=lambda n: "/usr/bin/" + n))
@@ -278,7 +287,8 @@ def test_a_first_round_writes_the_three_sections_and_comments_the_round(
         hub, ws, refined):
     number = task(hub)
     assert main(str(number)) == 0
-    assert refined.ran == ["business-goal", "technical", "acceptance-criteria"]
+    assert refined.ran == ["explore", "business-goal", "technical",
+                           "acceptance-criteria"]
     assert hub.body_of(number) == (
         "## Business Goal\n\nle business-goal\n\n"
         "## Technical\n\nle technical\n\n"
@@ -295,7 +305,7 @@ def test_a_second_round_buys_only_its_own_two_sections(hub, ws, refined):
     number = task(hub, body=ROUND_ONE_BODY)
     hub.comment(number, "refinement round: 1")
     assert main(str(number)) == 0
-    assert refined.ran == ["business-rules", "technical-plan"]
+    assert refined.ran == ["explore", "business-rules", "technical-plan"]
     assert hub.body_of(number).startswith(ROUND_ONE_BODY)
     assert labels.SPEC_WRITTEN in hub.labels_of(number)
 
@@ -320,7 +330,36 @@ def test_a_dry_run_writes_the_prompt_of_each_stage_it_would_have_run(hub, ws,
     assert main(str(number), "--dry-run") == 0
     written = sorted(p.name for p in (ws.refinement_dir / str(number)).glob("*"))
     assert written == ["r01-acceptance-criteria.log", "r01-business-goal.log",
-                       "r01-technical.log"]
+                       "r01-explore.log", "r01-technical.log"]
+
+
+def test_explore_gives_every_section_the_repository_back(hub, ws, refined):
+    """L'echappatoire, de bout en bout : aucune session d'exploration, et les
+    sections sont dites qu'elles n'ont pas de carte."""
+    number = task(hub)
+    assert main(str(number), "--explore") == 0
+    assert refined.ran == ["business-goal", "technical", "acceptance-criteria"]
+
+
+def test_the_map_reaches_every_section_that_the_round_pays_for(hub, ws,
+                                                               refined):
+    """Ce que l'exploration a rendu est ce que les sections lisent."""
+    refined.script["explore"] = "### Constraints\njamais de push sur main"
+    number = task(hub)
+    assert main(str(number)) == 0
+    paid = [p for p in refined.prompts if "You are establishing" not in p]
+    assert len(paid) == 3
+    assert all("jamais de push sur main" in p for p in paid)
+
+
+def test_a_round_whose_exploration_fails_pays_for_no_section(hub, ws,
+                                                             refined):
+    """Les sections ont ete reglees pour travailler sur une carte."""
+    refined.fails_on = "explore"
+    number = task(hub)
+    assert main(str(number)) == 2
+    assert refined.ran == ["explore"]
+    assert hub.wrote() == [], "un round sans carte a quand meme ecrit"
 
 
 def test_a_second_refinement_of_the_same_issue_does_not_start(hub, ws, refined):
@@ -336,7 +375,7 @@ def test_a_round_the_router_drives_writes_only_what_it_named(hub, ws, refined):
         hub.comment(number, f"refinement round: {n}")
     refined.script["router"] = "acceptance-criteria"
     assert main(str(number), "--context", "revois les criteres") == 0
-    assert refined.ran == ["router", "acceptance-criteria"]
+    assert refined.ran == ["explore", "router", "acceptance-criteria"]
     assert hub.body_of(number) == (
         "## Business Goal\n\nLe but.\n\n"
         "## Technical\n\nLa technique.\n\n"
@@ -351,7 +390,7 @@ def test_a_router_that_named_no_section_stops_before_paying_for_anything(
         hub.comment(number, f"refinement round: {n}")
     refined.script["router"] = "je ne sais pas"
     assert main(str(number), "--context", "revois tout") == 2
-    assert refined.ran == ["router"]
+    assert refined.ran == ["explore", "router"]
     assert hub.wrote() == []
 
 
@@ -361,7 +400,8 @@ def test_a_late_round_without_a_context_rewrites_the_five_sections(hub, ws,
     for n in (1, 2):
         hub.comment(number, f"refinement round: {n}")
     assert main(str(number)) == 0
-    assert refined.ran == ["business-goal", "technical", "acceptance-criteria",
+    assert refined.ran == ["explore", "business-goal", "technical",
+                           "acceptance-criteria",
                            "business-rules", "technical-plan"]
     assert hub.comments[number][-1] == "refinement round: 3"
 
@@ -382,7 +422,7 @@ def test_each_session_of_a_round_books_its_cost_under_the_round(hub, ws,
     assert main(str(number)) == 0
     rows = [l.split("\t") for l in
             ws.refinement_ledger.read_text(encoding="utf-8").splitlines()[1:]]
-    assert [r[ledger.STAGE] for r in rows] == ["business-rules",
+    assert [r[ledger.STAGE] for r in rows] == ["explore", "business-rules",
                                                "technical-plan"]
     assert {r[ledger.ROUND] for r in rows} == {"02"}
     assert {r[ledger.TASK] for r in rows} == {f"#{number}"}
