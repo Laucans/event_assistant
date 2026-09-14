@@ -36,6 +36,16 @@ class Git:
     def dirty_files(self) -> list[str]:
         return [l for l in self("status", "--porcelain").stdout.splitlines() if l]
 
+    def tracked_files(self) -> list[str]:
+        """Les fichiers que git suit, un par ligne.
+
+        `ls-files` et non un parcours du disque : ce que gitignore ecarte
+        l'est par construction — les dossiers de dependances, les artefacts de
+        build, les journaux — et la liste est exactement ce qu'un lecteur du
+        depot verrait.
+        """
+        return [l for l in self("ls-files").stdout.splitlines() if l]
+
     def has_branch(self, name: str) -> bool:
         return self("rev-parse", "--verify", "--quiet", name).returncode == 0
 

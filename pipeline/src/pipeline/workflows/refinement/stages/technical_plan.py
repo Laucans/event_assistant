@@ -28,12 +28,6 @@ scratch.
 
 {additional_context}
 
-This section is only worth what its file paths are worth, so read the code
-before you name one: docs/ARCHITECTURE.md for where things live, CLAUDE.md
-for the commands and the constraints, and the modules the task touches. A
-step that names a file which does not exist sends the implementer looking for
-it.
-
 Output the content of the section and nothing else: no `## Technical
 Implementation Plan` heading, no preamble, no closing remark, no code fence
 wrapped around the whole answer. One rule on the markdown inside it: never

@@ -28,11 +28,6 @@ scratch.
 
 {additional_context}
 
-Ground what you write in the repository rather than guessing: docs/PROJECT.md
-for the product rules, docs/ARCHITECTURE.md for the design, CLAUDE.md for the
-constraints that are not visible in the code, and the code itself for the
-rules already in force. Read whatever you need.
-
 Output the content of the section and nothing else: no `## Business Rules`
 heading, no preamble, no closing remark, no code fence wrapped around the
 whole answer. One rule on the markdown inside it: never write a level-2

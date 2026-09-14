@@ -84,6 +84,13 @@ class WorkflowConfig:
     permission_mode: str = "bypassPermissions"
     # Les etapes que ce run fait tourner, vide voulant dire toutes.
     stages: str = ""
+    # Rendre a chaque stage son exploration du depot, au lieu de lui servir
+    # une carte etablie une fois. Ici et pas chez un workflow : c'est un
+    # arbitrage entre ce qu'une session coute et ce qu'elle voit, et il se
+    # pose partout ou plusieurs sessions relisent le meme depot. Faux par
+    # defaut — la carte est ce qu'on veut ; `--explore` est l'echappatoire
+    # quand une session a besoin de regarder par elle-meme.
+    explore: bool = False
 
     def runs(self, skill: str) -> bool:
         """Ce skill fait-il partie de ce run ?"""

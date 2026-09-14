@@ -26,11 +26,6 @@ holds and fixing what does not, rather than rewriting from scratch.
 
 {additional_context}
 
-Ground what you write in the repository rather than guessing: read
-docs/ARCHITECTURE.md for the technical design, docs/PROJECT.md for the
-product, CLAUDE.md for the constraints, and the code the task touches. A
-design that names a module which does not exist is worse than no design.
-
 Output the content of the section and nothing else: no `## Technical`
 heading, no preamble, no closing remark, no code fence wrapped around the
 whole answer. One rule on the markdown inside it: never write a level-2

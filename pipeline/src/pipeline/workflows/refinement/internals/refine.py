@@ -9,6 +9,7 @@ ferait repartir le compteur a 1 et reecrirait le corps entier.
 from __future__ import annotations
 
 from pipeline.core.adapters import hub as adapters
+from pipeline.core.domain import prompts
 from pipeline.core.domain.issues import Issue
 from pipeline.core.domain.outcomes.result import Result
 from pipeline.core.runtime.filesystem.lock import claim
@@ -17,7 +18,16 @@ from pipeline.workflows.refinement.internals import rounds, sections
 
 
 class RefinementState:
-    """Ce que les etapes du raffinage se transmettent."""
+    """Ce que les etapes du raffinage se transmettent.
+
+    `brief` est ce que l'etape gratuite lit du depot, et seul l'explorateur le
+    lit ensuite. La carte, elle, n'est pas ici : elle voyage dans
+    `ctx.results` comme la sortie de toute etape payante.
+
+    Ni l'un ni l'autre dans `cfg.context` : la presence de celui-la decide si
+    le routeur tourne (`rounds.routed`), donc y deposer quoi que ce soit le
+    rallumerait a tous les rounds a partir du troisieme.
+    """
 
     def __init__(self) -> None:
         self.stages_done: list[str] = []
@@ -25,6 +35,19 @@ class RefinementState:
         self.round_no: int = 0
         self.found: dict[str, str] = {}
         self.wanted: list[str] = []
+        self.brief: str = ""
+
+    @property
+    def subject(self) -> str:
+        """Ce que ce round travaille, pour qui etablit la carte.
+
+        L'issue entiere : c'est elle qui dit quelles parties du depot comptent
+        et lesquelles n'ont rien a faire dans la carte.
+        """
+        if self.issue is None:
+            return ""
+        return (f"GitHub issue #{self.issue.number} — {self.issue.title}\n\n"
+                f"{self.issue.body.strip() or prompts.EMPTY_BODY}")
 
 
 def _unread(cfg, got: Result, channel: str) -> Result[str]:

@@ -49,22 +49,39 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Env overrides — an undiscoverable knob is a knob nobody turns:\n"
                "  REFINEMENT_MODEL             force one model on every stage\n"
-               "  REFINEMENT_GOAL_MODEL        model of Business Goal (default opus)\n"
-               "  REFINEMENT_GOAL_EFFORT       effort of Business Goal (default high)\n"
-               "  REFINEMENT_TECHNICAL_MODEL   model of Technical (default opus)\n"
-               "  REFINEMENT_TECHNICAL_EFFORT  effort of Technical (default high)\n"
-               "  REFINEMENT_CRITERIA_MODEL    model of Acceptance Criteria (default sonnet)\n"
-               "  REFINEMENT_CRITERIA_EFFORT   effort of Acceptance Criteria (default high)\n"
-               "  REFINEMENT_RULES_MODEL       model of Business Rules (default opus)\n"
-               "  REFINEMENT_RULES_EFFORT      effort of Business Rules (default high)\n"
-               "  REFINEMENT_PLAN_MODEL        model of Technical Implementation Plan"
-               " (default opus)\n"
-               "  REFINEMENT_PLAN_EFFORT       effort of Technical Implementation Plan"
-               " (default high)\n"
-               "  REFINEMENT_ROUTER_MODEL      model of the round >= 3 router"
-               " (default sonnet)\n"
-               "  REFINEMENT_ROUTER_EFFORT     effort of the round >= 3 router"
-               " (default low)\n"
+               f"  REFINEMENT_GOAL_MODEL        model of Business Goal"
+               f" (default {RefinementConfig.goal_model})\n"
+               f"  REFINEMENT_GOAL_EFFORT       effort of Business Goal"
+               f" (default {RefinementConfig.goal_effort})\n"
+               f"  REFINEMENT_TECHNICAL_MODEL   model of Technical"
+               f" (default {RefinementConfig.technical_model})\n"
+               f"  REFINEMENT_TECHNICAL_EFFORT  effort of Technical"
+               f" (default {RefinementConfig.technical_effort})\n"
+               f"  REFINEMENT_CRITERIA_MODEL    model of Acceptance Criteria"
+               f" (default {RefinementConfig.criteria_model})\n"
+               f"  REFINEMENT_CRITERIA_EFFORT   effort of Acceptance Criteria"
+               f" (default {RefinementConfig.criteria_effort})\n"
+               f"  REFINEMENT_RULES_MODEL       model of Business Rules"
+               f" (default {RefinementConfig.rules_model})\n"
+               f"  REFINEMENT_RULES_EFFORT      effort of Business Rules"
+               f" (default {RefinementConfig.rules_effort})\n"
+               f"  REFINEMENT_PLAN_MODEL        model of Technical Implementation Plan"
+               f" (default {RefinementConfig.plan_model})\n"
+               f"  REFINEMENT_PLAN_EFFORT       effort of Technical Implementation Plan"
+               f" (default {RefinementConfig.plan_effort})\n"
+               f"  REFINEMENT_ROUTER_MODEL      model of the round >= 3 router"
+               f" (default {RefinementConfig.router_model})\n"
+               f"  REFINEMENT_ROUTER_EFFORT     effort of the round >= 3 router"
+               f" (default {RefinementConfig.router_effort})\n"
+               f"  REFINEMENT_EXPLORE_MODEL     model of the repo map"
+               f" (default {RefinementConfig.explore_model})\n"
+               f"  REFINEMENT_EXPLORE_EFFORT    effort of the repo map"
+               f" (default {RefinementConfig.explore_effort})\n"
+               "\n"
+               "One session reads the repository before the round and writes a\n"
+               "map; the sections work from it instead of exploring on their own.\n"
+               "--explore drops the map and gives every section the repository\n"
+               "back — more thorough, and several times the tokens.\n"
                "\n"
                "The issue must carry pipeline:refinement (or --force) and either\n"
                "pipeline:agent or pipeline:human. Issues are public: never write\n"
@@ -83,6 +100,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="what this round asks for; injected into every stage prompt")
     p.add_argument("--force", action="store_true",
                    help="refine an issue that does not carry pipeline:refinement")
+    p.add_argument("--explore", action="store_true",
+                   help="no repo map: let every section read the repository"
+                        " itself (thorough, and several times the tokens)")
     p.add_argument("--dry-run", action="store_true",
                    help="write the prompts, call nothing")
     p.add_argument("--verbose", "-v", action="store_true",
@@ -115,22 +135,31 @@ def build_config(args: argparse.Namespace) -> RefinementConfig:
         issue=args.issue,
         context=args.context,
         force=args.force,
+        explore=args.explore,
         dry_run=args.dry_run,
         verbose=args.verbose,
         quiet=args.quiet,
         heartbeat_s=args.heartbeat,
-        goal_model=forced or _env("REFINEMENT_GOAL_MODEL", "opus"),
-        goal_effort=_env("REFINEMENT_GOAL_EFFORT", "high"),
-        technical_model=forced or _env("REFINEMENT_TECHNICAL_MODEL", "opus"),
-        technical_effort=_env("REFINEMENT_TECHNICAL_EFFORT", "high"),
-        criteria_model=forced or _env("REFINEMENT_CRITERIA_MODEL", "sonnet"),
-        criteria_effort=_env("REFINEMENT_CRITERIA_EFFORT", "high"),
-        rules_model=forced or _env("REFINEMENT_RULES_MODEL", "opus"),
-        rules_effort=_env("REFINEMENT_RULES_EFFORT", "high"),
-        plan_model=forced or _env("REFINEMENT_PLAN_MODEL", "opus"),
-        plan_effort=_env("REFINEMENT_PLAN_EFFORT", "high"),
-        router_model=forced or _env("REFINEMENT_ROUTER_MODEL", "sonnet"),
-        router_effort=_env("REFINEMENT_ROUTER_EFFORT", "low"),
+        goal_model=forced or _env("REFINEMENT_GOAL_MODEL", RefinementConfig.goal_model),
+        goal_effort=_env("REFINEMENT_GOAL_EFFORT", RefinementConfig.goal_effort),
+        technical_model=forced or _env("REFINEMENT_TECHNICAL_MODEL",
+                                        RefinementConfig.technical_model),
+        technical_effort=_env("REFINEMENT_TECHNICAL_EFFORT",
+                               RefinementConfig.technical_effort),
+        criteria_model=forced or _env("REFINEMENT_CRITERIA_MODEL",
+                                       RefinementConfig.criteria_model),
+        criteria_effort=_env("REFINEMENT_CRITERIA_EFFORT",
+                              RefinementConfig.criteria_effort),
+        rules_model=forced or _env("REFINEMENT_RULES_MODEL", RefinementConfig.rules_model),
+        rules_effort=_env("REFINEMENT_RULES_EFFORT", RefinementConfig.rules_effort),
+        plan_model=forced or _env("REFINEMENT_PLAN_MODEL", RefinementConfig.plan_model),
+        plan_effort=_env("REFINEMENT_PLAN_EFFORT", RefinementConfig.plan_effort),
+        router_model=forced or _env("REFINEMENT_ROUTER_MODEL", RefinementConfig.router_model),
+        router_effort=_env("REFINEMENT_ROUTER_EFFORT", RefinementConfig.router_effort),
+        explore_model=forced or _env("REFINEMENT_EXPLORE_MODEL",
+                                      RefinementConfig.explore_model),
+        explore_effort=_env("REFINEMENT_EXPLORE_EFFORT",
+                             RefinementConfig.explore_effort),
         workspace=Workspace.here(),
         # Un raffinage lance par un declencheur tourne detache : stderr est la
         # seule chose qu'un appelant qui n'ouvre pas le log verra passer.

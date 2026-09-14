@@ -7,6 +7,7 @@ avant la depense, ici.
 
 import re
 import types
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,7 @@ from pipeline.core.domain.action import Action
 from pipeline.core.domain.issues import Issue
 from pipeline.core.domain.stage_spec import StageSpec
 from pipeline.core.runtime.filesystem.workspace import Workspace
+from pipeline.workflows.common import stages as common
 from pipeline.workflows.refinement import stages
 from pipeline.workflows.refinement.internals import refine, sections
 from pipeline.workflows.refinement.settings import RefinementConfig
@@ -40,14 +42,20 @@ def flat(text):
     return " ".join(text.split())
 
 
-def built(skill, *, context="", round_no=2, issue=ISSUE, tmp_path=None):
+def built(skill, *, context="", round_no=2, issue=ISSUE, tmp_path=None,
+          repo_context=""):
     """Le texte que ce stage recevrait, monte comme la sequence le monte."""
     cfg = RefinementConfig(issue=25, context=context,
                            workspace=Workspace(tmp_path or "/tmp"))
     state = refine.RefinementState()
     state.issue = issue
     state.round_no = round_no
-    ctx = types.SimpleNamespace(cfg=cfg)
+    # La carte voyage par `ctx.results`, sous le nom de l'etape qui l'a
+    # produite — comme la reponse du routeur et comme chaque section.
+    ctx = types.SimpleNamespace(
+        cfg=cfg, log_dir=Path(tmp_path or "/tmp"), round_no=round_no,
+        results=({common.SKILL: types.SimpleNamespace(text=repo_context)}
+                 if repo_context else {}))
     return stages.prompt_of(types.SimpleNamespace(skill=skill), ctx, state)
 
 
@@ -57,6 +65,7 @@ def built(skill, *, context="", round_no=2, issue=ISSUE, tmp_path=None):
 def test_the_sequence_is_the_router_the_five_sections_then_the_publication():
     cfg = RefinementConfig(issue=25)
     assert [step.skill for step in stages.passes(cfg)] == [
+        "ground", "explore",
         "router", "business-goal", "technical", "acceptance-criteria",
         "business-rules", "technical-plan", "publish"]
 
@@ -67,11 +76,13 @@ def test_the_sections_run_in_the_order_the_body_is_written_in():
     assert [k for k in ran if k in sections.KEYS] == list(sections.KEYS)
 
 
-def test_the_publication_is_a_local_step_and_the_rest_are_paid_sessions():
-    cfg = RefinementConfig(issue=25)
-    table = stages.passes(cfg)
-    assert isinstance(table[-1], Action)
-    assert all(isinstance(step, StageSpec) for step in table[:-1])
+def test_the_two_local_steps_are_the_grounding_and_the_publication():
+    """Les deux bouts de la table ne paient rien : l'un lit le depot, l'autre
+    ecrit dans l'issue. Tout ce qui est entre est une session."""
+    table = stages.passes(RefinementConfig(issue=25))
+    local = [step.skill for step in table if isinstance(step, Action)]
+    assert local == [common.GROUND, "publish"]
+    assert all(isinstance(step, StageSpec) for step in table[1:-1])
 
 
 def test_every_section_has_a_prompt_and_a_pair_of_knobs():
@@ -93,7 +104,9 @@ def test_each_section_runs_on_the_model_its_own_knob_names():
 
 def test_the_router_is_the_cheap_one():
     cfg = RefinementConfig(issue=25)
-    router = stages.passes(cfg)[0]
+    # Par son nom et non par sa place : la table a gagne deux entrees en tete,
+    # et un index fige aurait rendu ce test muet plutot que rouge.
+    router = next(s for s in stages.passes(cfg) if s.skill == stages.ROUTER)
     assert (router.model, router.effort) == ("sonnet", "low")
 
 
@@ -222,3 +235,79 @@ def test_a_context_that_names_a_field_is_not_a_second_substitution(key):
                  issue=ISSUE)
     assert "garde la section {body} telle quelle" in said
     assert said.count(ISSUE.body.strip()) == 1
+
+
+# --- la carte du depot -----------------------------------------------------
+#
+# Ce qui a remplace le paragraphe « va lire docs/ARCHITECTURE.md » que les six
+# templates portaient chacun a sa facon. Le registre disait le prix de ces six
+# copies : sept a quinze tours par section, dont la moitie a s'orienter.
+
+
+@pytest.mark.parametrize("skill", ALL_SKILLS)
+def test_no_template_carries_the_repo_context_placeholder(skill):
+    """La carte prefixe le texte monte, elle n'est pas un champ substitue :
+    un `{repo_context}` que six templates auraient porte chacun se serait tu
+    en silence si l'un l'avait perdu, la ou un prefixe ne peut pas manquer."""
+    template = (stages.ROUTER_PROMPT if skill == stages.ROUTER
+                else stages.PROMPTS[skill])
+    assert "{repo_context}" not in template
+
+
+@pytest.mark.parametrize("skill", ALL_SKILLS)
+def test_every_stage_opens_on_the_repo_map_identically(skill):
+    """En tete, et identique partout : c'est ce qui donne aux six sessions un
+    prefixe de cache commun. L'hypothese se verifie sur `cache_write` dans
+    .llocal/refinement/costs.tsv — la place, elle, ne coute rien."""
+    assert built(skill).startswith(common.UNMAPPED)
+    said = built(skill, repo_context="### Constraints\njamais de push sur main")
+    assert said.startswith(common.OPEN)
+
+
+@pytest.mark.parametrize("skill", ALL_SKILLS)
+def test_no_template_still_sends_a_section_reading_the_documents(skill):
+    """Une carte **ajoutee** pendant que la consigne reste augmente le cout au
+    lieu de le reduire : elle s'ajoute a l'exploration au lieu de la
+    remplacer."""
+    template = (stages.ROUTER_PROMPT if skill == stages.ROUTER
+                else stages.PROMPTS[skill])
+    said = flat(template)
+    assert "Ground what you write in the repository" not in said
+    assert "Read whatever you need" not in said
+    assert "Read the repository if you need" not in said
+
+
+@pytest.mark.parametrize("skill", ALL_SKILLS)
+def test_a_stage_without_a_map_is_told_so_in_words(skill):
+    """Sinon elle ne distingue pas « rien a savoir » de « injection cassee »."""
+    assert "No map was established" in built(skill)
+
+
+@pytest.mark.parametrize("skill", ALL_SKILLS)
+def test_a_stage_with_a_map_gets_it_and_is_told_what_it_may_still_open(skill):
+    said = built(skill, repo_context="### Constraints\njamais de push sur main")
+    assert "jamais de push sur main" in said
+    assert "you do not have to orient yourself" in flat(said)
+    assert "No map was established" not in said
+
+
+def test_the_map_enters_the_prompt_in_the_same_pass_as_the_body():
+    """La carte cite les fichiers du depot : elle porte litteralement les
+    `{body}` et `{num}` des templates qu'elle a lus, et une seconde passe de
+    remplacement les substituerait."""
+    said = built("technical", repo_context="le template porte {body} et {num}")
+    assert "le template porte {body} et {num}" in said
+
+
+def test_the_map_does_not_turn_the_router_on():
+    """`cfg.context` decide si le routeur tourne : y deposer la carte le
+    rallumerait a tous les rounds a partir du troisieme."""
+    from pipeline.workflows.refinement.internals import gates, rounds
+
+    state = refine.RefinementState()
+    state.round_no = 3
+    cfg = RefinementConfig(issue=25)
+    ctx = types.SimpleNamespace(cfg=cfg)
+    assert cfg.context == ""
+    assert not rounds.routed(3, bool(cfg.context))
+    assert gates.router_is_off(ctx, state).value, "le routeur s'est allume"

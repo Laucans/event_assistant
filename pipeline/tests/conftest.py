@@ -116,6 +116,33 @@ def hub(monkeypatch):
     return fake
 
 
+class FakeGit:
+    """Ce que `hub.repo` rend quand le depot est sur papier.
+
+    Assez pour l'exploration : la liste des fichiers suivis. Le reste de
+    `Git` n'est pas double — un test qui en aurait besoin le dirait en
+    echouant, plutot qu'en recevant une valeur inventee.
+    """
+
+    files = ("CLAUDE.md", "docs/ARCHITECTURE.md", "docs/PROJECT.md",
+             "src/app/page.tsx")
+
+    def __init__(self, root, run=None) -> None:
+        self.root = root
+
+    def tracked_files(self) -> list[str]:
+        return list(self.files)
+
+
+@pytest.fixture
+def repo(monkeypatch):
+    """Git sur papier, branche la ou tout le paquet le construit."""
+    from pipeline.core.adapters import hub as adapters
+
+    monkeypatch.setattr(adapters, "git", FakeGit)
+    return FakeGit
+
+
 def milestone(fake, *, ready=(), tasks=("Une task",), title="Le milestone",
               body="Le corps du milestone"):
     """Un milestone et ses tasks, la forme que la plupart des tests veulent.

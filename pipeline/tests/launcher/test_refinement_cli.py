@@ -21,21 +21,30 @@ from pipeline.workflows.refinement.settings import RefinementConfig
 ROOT = Workspace.here().root
 REFINEMENT = routes.find("refinement")
 
-# Les six couples du tableau des modeles : la variable, le champ qu'elle
-# regle, et le defaut qu'elle remplace.
-KNOBS = (("REFINEMENT_GOAL_MODEL", "goal_model", "opus"),
-         ("REFINEMENT_TECHNICAL_MODEL", "technical_model", "opus"),
-         ("REFINEMENT_CRITERIA_MODEL", "criteria_model", "sonnet"),
-         ("REFINEMENT_RULES_MODEL", "rules_model", "opus"),
-         ("REFINEMENT_PLAN_MODEL", "plan_model", "opus"),
-         ("REFINEMENT_ROUTER_MODEL", "router_model", "sonnet"))
+# Les couples du tableau des modeles : la variable, le champ qu'elle
+# regle, et le defaut qu'elle remplace — celui de `RefinementConfig` meme,
+# pour que ce test suive `settings.py` au lieu de figer une valeur a cote.
+KNOBS = (("REFINEMENT_GOAL_MODEL", "goal_model", RefinementConfig.goal_model),
+         ("REFINEMENT_TECHNICAL_MODEL", "technical_model",
+          RefinementConfig.technical_model),
+         ("REFINEMENT_CRITERIA_MODEL", "criteria_model",
+          RefinementConfig.criteria_model),
+         ("REFINEMENT_RULES_MODEL", "rules_model", RefinementConfig.rules_model),
+         ("REFINEMENT_PLAN_MODEL", "plan_model", RefinementConfig.plan_model),
+         ("REFINEMENT_ROUTER_MODEL", "router_model", RefinementConfig.router_model),
+         ("REFINEMENT_EXPLORE_MODEL", "explore_model",
+          RefinementConfig.explore_model))
 
-EFFORTS = (("REFINEMENT_GOAL_EFFORT", "goal_effort", "high"),
-           ("REFINEMENT_TECHNICAL_EFFORT", "technical_effort", "high"),
-           ("REFINEMENT_CRITERIA_EFFORT", "criteria_effort", "high"),
-           ("REFINEMENT_RULES_EFFORT", "rules_effort", "high"),
-           ("REFINEMENT_PLAN_EFFORT", "plan_effort", "high"),
-           ("REFINEMENT_ROUTER_EFFORT", "router_effort", "low"))
+EFFORTS = (("REFINEMENT_GOAL_EFFORT", "goal_effort", RefinementConfig.goal_effort),
+           ("REFINEMENT_TECHNICAL_EFFORT", "technical_effort",
+            RefinementConfig.technical_effort),
+           ("REFINEMENT_CRITERIA_EFFORT", "criteria_effort",
+            RefinementConfig.criteria_effort),
+           ("REFINEMENT_RULES_EFFORT", "rules_effort", RefinementConfig.rules_effort),
+           ("REFINEMENT_PLAN_EFFORT", "plan_effort", RefinementConfig.plan_effort),
+           ("REFINEMENT_ROUTER_EFFORT", "router_effort", RefinementConfig.router_effort),
+           ("REFINEMENT_EXPLORE_EFFORT", "explore_effort",
+            RefinementConfig.explore_effort))
 
 ALL_VARS = [v for v, _, _ in KNOBS + EFFORTS] + ["REFINEMENT_MODEL"]
 
@@ -124,18 +133,19 @@ def test_each_stage_has_its_own_effort_and_its_own_variable(monkeypatch,
     assert getattr(config("25"), field) == other
 
 
-def test_one_variable_forces_the_same_model_on_the_six_stages(monkeypatch):
+def test_one_variable_forces_the_same_model_on_every_stage(monkeypatch):
     """Le bouton qu'on tourne pour essayer un round entier au rabais."""
     monkeypatch.setenv("REFINEMENT_MODEL", "haiku")
     cfg = config("25")
-    assert [getattr(cfg, field) for _, field, _ in KNOBS] == ["haiku"] * 6
+    assert ([getattr(cfg, field) for _, field, _ in KNOBS]
+            == ["haiku"] * len(KNOBS))
 
 
 def test_forcing_one_model_leaves_each_effort_alone(monkeypatch):
     monkeypatch.setenv("REFINEMENT_MODEL", "haiku")
     cfg = config("25")
-    assert [getattr(cfg, field) for _, field, _ in EFFORTS] == (
-        ["high"] * 5 + ["low"])
+    assert ([getattr(cfg, field) for _, field, _ in EFFORTS]
+            == [default for _, _, default in EFFORTS])
 
 
 def test_the_forced_model_beats_the_per_stage_ones(monkeypatch):
