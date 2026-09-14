@@ -73,6 +73,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                f" (default {RefinementConfig.router_model})\n"
                f"  REFINEMENT_ROUTER_EFFORT     effort of the round >= 3 router"
                f" (default {RefinementConfig.router_effort})\n"
+               f"  REFINEMENT_COHERENCE_MODEL   model of the closing coherence pass"
+               f" (default {RefinementConfig.coherence_model})\n"
+               f"  REFINEMENT_COHERENCE_EFFORT  effort of the closing coherence pass"
+               f" (default {RefinementConfig.coherence_effort})\n"
                f"  REFINEMENT_EXPLORE_MODEL     model of the repo map"
                f" (default {RefinementConfig.explore_model})\n"
                f"  REFINEMENT_EXPLORE_EFFORT    effort of the repo map"
@@ -82,6 +86,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                "map; the sections work from it instead of exploring on their own.\n"
                "--explore drops the map and gives every section the repository\n"
                "back — more thorough, and several times the tokens.\n"
+               "\n"
+               "A last session reads every section this round wrote, together,\n"
+               "and retouches whichever ones disagree with each other before\n"
+               "anything is published.\n"
                "\n"
                "The issue must carry pipeline:refinement (or --force) and either\n"
                "pipeline:agent or pipeline:human. Issues are public: never write\n"
@@ -127,7 +135,7 @@ def _env(name: str, default: str) -> str:
 def build_config(args: argparse.Namespace) -> RefinementConfig:
     """Les flags et l'environnement, resolus en une config de raffinage.
 
-    `REFINEMENT_MODEL` force les six stages ; les `REFINEMENT_*_MODEL/EFFORT`
+    `REFINEMENT_MODEL` force les sept stages ; les `REFINEMENT_*_MODEL/EFFORT`
     les reglent separement, parce que ce ne sont pas le meme travail.
     """
     forced = _env("REFINEMENT_MODEL", "")
@@ -156,6 +164,10 @@ def build_config(args: argparse.Namespace) -> RefinementConfig:
         plan_effort=_env("REFINEMENT_PLAN_EFFORT", RefinementConfig.plan_effort),
         router_model=forced or _env("REFINEMENT_ROUTER_MODEL", RefinementConfig.router_model),
         router_effort=_env("REFINEMENT_ROUTER_EFFORT", RefinementConfig.router_effort),
+        coherence_model=forced or _env("REFINEMENT_COHERENCE_MODEL",
+                                        RefinementConfig.coherence_model),
+        coherence_effort=_env("REFINEMENT_COHERENCE_EFFORT",
+                               RefinementConfig.coherence_effort),
         explore_model=forced or _env("REFINEMENT_EXPLORE_MODEL",
                                       RefinementConfig.explore_model),
         explore_effort=_env("REFINEMENT_EXPLORE_EFFORT",

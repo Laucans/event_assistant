@@ -124,6 +124,61 @@ def test_a_stage_the_sequence_never_ran_does_not_erase_its_section_either(
     assert hub.body_of(number) == "## Business Goal\n\nLe but.\n"
 
 
+# --- la coherence retouche le corps, ou est ignoree en bloc -----------------
+
+
+def test_a_coherent_retouch_replaces_the_plain_merge(hub, ws):
+    """Ce qu'elle rend, quand elle garde tout, devient le corps publie."""
+    number = task(hub)
+    got, _ = write(hub, ws, number,
+                   wanted=("business-goal", "technical",
+                           "acceptance-criteria"),
+                   results={"business-goal": "Le but.",
+                            "technical": "La technique.",
+                            "acceptance-criteria": "- un critere",
+                            "coherence": "## Business Goal\n\nLe but retouche.\n\n"
+                                        "## Technical\n\nLa technique.\n\n"
+                                        "## Acceptance Criteria\n\n- un critere\n"})
+    assert got.ok
+    assert hub.body_of(number) == (
+        "## Business Goal\n\nLe but retouche.\n\n"
+        "## Technical\n\nLa technique.\n\n"
+        "## Acceptance Criteria\n\n- un critere\n")
+
+
+def test_a_retouch_that_drops_a_section_is_ignored_in_block(hub, ws):
+    """Perdre une section en corrigeant les autres serait une incoherence de
+    plus, pas une de moins : le round publie le simple merge a la place."""
+    number = task(hub)
+    got, _ = write(hub, ws, number,
+                   wanted=("business-goal", "technical"),
+                   results={"business-goal": "Le but.",
+                            "technical": "La technique.",
+                            "coherence": "## Business Goal\n\nLe but retouche.\n"})
+    assert got.ok
+    assert hub.body_of(number) == (
+        "## Business Goal\n\nLe but.\n\n## Technical\n\nLa technique.\n")
+
+
+def test_a_coherence_output_with_no_recognised_heading_is_ignored(hub, ws):
+    number = task(hub)
+    got, _ = write(hub, ws, number, wanted=("business-goal",),
+                   results={"business-goal": "Le but.",
+                            "coherence": "n'importe quoi, sans titres"})
+    assert got.ok
+    assert hub.body_of(number) == "## Business Goal\n\nLe but.\n"
+
+
+def test_no_coherence_result_leaves_the_plain_merge_untouched(hub, ws):
+    """Le dry-run et toute reprise qui a saute la coherence : le contrat par
+    defaut, deja couvert implicitement par le reste de cette suite."""
+    number = task(hub)
+    got, _ = write(hub, ws, number, wanted=("business-goal",),
+                   results={"business-goal": "Le but."})
+    assert got.ok
+    assert hub.body_of(number) == "## Business Goal\n\nLe but.\n"
+
+
 def test_a_round_with_nothing_to_write_fails_instead_of_emptying_the_issue(
         hub, ws):
     """Un corps vide efface la demande et ne laisse rien a sa place."""
@@ -222,6 +277,7 @@ def test_a_human_task_is_specified_from_the_end_of_round_one(hub, ws, round_no):
 
 MARKS = (("You are establishing the map", "explore"),
          ("You are routing", "router"),
+         ("You are the last step", "coherence"),
          ("**Technical Implementation Plan**", "technical-plan"),
          ("**Business Goal**", "business-goal"),
          ("**Technical** section", "technical"),
@@ -288,7 +344,7 @@ def test_a_first_round_writes_the_three_sections_and_comments_the_round(
     number = task(hub)
     assert main(str(number)) == 0
     assert refined.ran == ["explore", "business-goal", "technical",
-                           "acceptance-criteria"]
+                           "acceptance-criteria", "coherence"]
     assert hub.body_of(number) == (
         "## Business Goal\n\nle business-goal\n\n"
         "## Technical\n\nle technical\n\n"
@@ -305,9 +361,34 @@ def test_a_second_round_buys_only_its_own_two_sections(hub, ws, refined):
     number = task(hub, body=ROUND_ONE_BODY)
     hub.comment(number, "refinement round: 1")
     assert main(str(number)) == 0
-    assert refined.ran == ["explore", "business-rules", "technical-plan"]
+    assert refined.ran == ["explore", "business-rules", "technical-plan",
+                           "coherence"]
     assert hub.body_of(number).startswith(ROUND_ONE_BODY)
     assert labels.SPEC_WRITTEN in hub.labels_of(number)
+
+
+def test_a_scripted_coherence_retouch_reaches_the_published_body(hub, ws,
+                                                                  refined):
+    number = task(hub)
+    refined.script["coherence"] = (
+        "## Business Goal\n\nle business-goal, retouche.\n\n"
+        "## Technical\n\nle technical\n\n"
+        "## Acceptance Criteria\n\nle acceptance-criteria\n")
+    assert main(str(number)) == 0
+    assert hub.body_of(number) == refined.script["coherence"]
+
+
+def test_a_coherence_pass_that_drops_a_section_still_publishes(hub, ws,
+                                                                refined):
+    """La session de coherence rate, mais les trois sections payees ne sont
+    pas perdues pour autant : le round publie le simple merge."""
+    number = task(hub)
+    refined.script["coherence"] = "n'importe quoi, sans titres reconnus"
+    assert main(str(number)) == 0
+    assert hub.body_of(number) == (
+        "## Business Goal\n\nle business-goal\n\n"
+        "## Technical\n\nle technical\n\n"
+        "## Acceptance Criteria\n\nle acceptance-criteria\n")
 
 
 def test_a_dry_run_writes_nothing_on_github_and_pays_for_nothing(hub, ws,
@@ -330,7 +411,8 @@ def test_a_dry_run_writes_the_prompt_of_each_stage_it_would_have_run(hub, ws,
     assert main(str(number), "--dry-run") == 0
     written = sorted(p.name for p in (ws.refinement_dir / str(number)).glob("*"))
     assert written == ["r01-acceptance-criteria.log", "r01-business-goal.log",
-                       "r01-explore.log", "r01-technical.log"]
+                       "r01-coherence.log", "r01-explore.log",
+                       "r01-technical.log"]
 
 
 def test_explore_gives_every_section_the_repository_back(hub, ws, refined):
@@ -338,7 +420,8 @@ def test_explore_gives_every_section_the_repository_back(hub, ws, refined):
     sections sont dites qu'elles n'ont pas de carte."""
     number = task(hub)
     assert main(str(number), "--explore") == 0
-    assert refined.ran == ["business-goal", "technical", "acceptance-criteria"]
+    assert refined.ran == ["business-goal", "technical", "acceptance-criteria",
+                           "coherence"]
 
 
 def test_the_map_reaches_every_section_that_the_round_pays_for(hub, ws,
@@ -348,7 +431,7 @@ def test_the_map_reaches_every_section_that_the_round_pays_for(hub, ws,
     number = task(hub)
     assert main(str(number)) == 0
     paid = [p for p in refined.prompts if "You are establishing" not in p]
-    assert len(paid) == 3
+    assert len(paid) == 4
     assert all("jamais de push sur main" in p for p in paid)
 
 
@@ -375,7 +458,8 @@ def test_a_round_the_router_drives_writes_only_what_it_named(hub, ws, refined):
         hub.comment(number, f"refinement round: {n}")
     refined.script["router"] = "acceptance-criteria"
     assert main(str(number), "--context", "revois les criteres") == 0
-    assert refined.ran == ["explore", "router", "acceptance-criteria"]
+    assert refined.ran == ["explore", "router", "acceptance-criteria",
+                           "coherence"]
     assert hub.body_of(number) == (
         "## Business Goal\n\nLe but.\n\n"
         "## Technical\n\nLa technique.\n\n"
@@ -402,7 +486,7 @@ def test_a_late_round_without_a_context_rewrites_the_five_sections(hub, ws,
     assert main(str(number)) == 0
     assert refined.ran == ["explore", "business-goal", "technical",
                            "acceptance-criteria",
-                           "business-rules", "technical-plan"]
+                           "business-rules", "technical-plan", "coherence"]
     assert hub.comments[number][-1] == "refinement round: 3"
 
 
@@ -423,7 +507,7 @@ def test_each_session_of_a_round_books_its_cost_under_the_round(hub, ws,
     rows = [l.split("\t") for l in
             ws.refinement_ledger.read_text(encoding="utf-8").splitlines()[1:]]
     assert [r[ledger.STAGE] for r in rows] == ["explore", "business-rules",
-                                               "technical-plan"]
+                                               "technical-plan", "coherence"]
     assert {r[ledger.ROUND] for r in rows} == {"02"}
     assert {r[ledger.TASK] for r in rows} == {f"#{number}"}
     assert {r[ledger.OUTCOME] for r in rows} == {"ok"}

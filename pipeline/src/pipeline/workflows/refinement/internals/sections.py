@@ -80,3 +80,19 @@ def missing(found: dict[str, str]) -> tuple[str, ...]:
     """Les cles du round 1 absentes du corps, ou vides."""
     return tuple(key for key in keys_of_round(1)
                  if not (found.get(key) or "").strip())
+
+
+def merge(found: dict[str, str], wanted, results) -> dict[str, str]:
+    """Le corps que ce round rendrait : `found`, remplace pour les cles visees.
+
+    Un stage qui n'a rien rendu laisse la section precedente en place plutot
+    que de l'effacer — `results` porte ce qu'une reprise ou un dry-run n'a pas
+    paye aussi bien que ce qu'une session a rendu vide.
+    """
+    merged = dict(found)
+    for key in wanted:
+        got = results.get(key)
+        text = (got.text.strip() if got is not None else "")
+        if text:
+            merged[key] = text
+    return merged

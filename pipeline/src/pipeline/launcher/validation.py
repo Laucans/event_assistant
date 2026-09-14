@@ -36,6 +36,7 @@ REFINEMENT_EFFORTS = (("REFINEMENT_GOAL_EFFORT", "goal_effort"),
                       ("REFINEMENT_RULES_EFFORT", "rules_effort"),
                       ("REFINEMENT_PLAN_EFFORT", "plan_effort"),
                       ("REFINEMENT_ROUTER_EFFORT", "router_effort"),
+                      ("REFINEMENT_COHERENCE_EFFORT", "coherence_effort"),
                       ("REFINEMENT_EXPLORE_EFFORT", "explore_effort"))
 
 EFFORTS = "|".join(stage_spec.EFFORTS)

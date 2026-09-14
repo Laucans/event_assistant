@@ -5,6 +5,8 @@ aller-retour : le corps qu'un round ecrit est celui que le round suivant
 relit, et une section perdue entre les deux est une session payee pour rien.
 """
 
+import types
+
 import pytest
 
 from pipeline.workflows.refinement.internals import sections
@@ -119,3 +121,41 @@ def test_what_round_one_still_owes_is_what_the_body_does_not_carry():
 def test_a_section_of_round_two_is_never_something_round_one_owes():
     assert sections.missing({"business-rules": "1. une regle"}) == (
         "business-goal", "technical", "acceptance-criteria")
+
+
+# --- le merge que publie et la coherence partagent --------------------------
+
+
+def answered(text: str):
+    """Ce qu'un `ctx.results` porte pour une cle : juste assez pour `merge`."""
+    return types.SimpleNamespace(text=text)
+
+
+def test_merge_replaces_only_the_keys_this_round_wanted():
+    found = {"business-goal": "Le but.", "technical": "La technique."}
+    results = {"technical": answered("La technique retouchee.")}
+    assert sections.merge(found, ["technical"], results) == {
+        "business-goal": "Le but.", "technical": "La technique retouchee."}
+
+
+def test_merge_keeps_a_section_no_stage_touched_this_round():
+    found = {"business-goal": "Le but."}
+    assert sections.merge(found, [], {}) == {"business-goal": "Le but."}
+
+
+def test_merge_leaves_the_previous_section_when_a_stage_rendered_nothing():
+    """Une session muette effacerait ce que la precedente avait paye."""
+    found = {"business-goal": "Le but."}
+    results = {"business-goal": answered("   \n ")}
+    assert sections.merge(found, ["business-goal"], results) == found
+
+
+def test_merge_leaves_the_previous_section_when_the_stage_never_ran():
+    found = {"business-goal": "Le but."}
+    assert sections.merge(found, ["business-goal"], {}) == found
+
+
+def test_merge_can_introduce_a_key_found_never_carried():
+    results = {"business-rules": answered("1. une regle")}
+    assert sections.merge({}, ["business-rules"], results) == {
+        "business-rules": "1. une regle"}

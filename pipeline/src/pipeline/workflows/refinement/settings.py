@@ -2,7 +2,7 @@
 
 Ce qui est commun a toute config de workflow vient de `WorkflowConfig`. Ce
 qui reste ici est ce que le raffinage seul connait : l'issue, le contexte du
-round, et le modele de chacune des sessions qu'un round peut payer — les six
+round, et le modele de chacune des sessions qu'un round peut payer — les sept
 de la table, et l'exploration qui les precede. Les defauts d'environnement
 sont lus par le point d'entree, pas ici.
 """
@@ -38,6 +38,10 @@ class RefinementConfig(WorkflowConfig):
     plan_effort: str = "high"
     router_model: str = "sonnet"
     router_effort: str = "low"
+    # La derniere entree payante de la table : elle relit les sections de ce
+    # round ensemble et retouche ce qui ne tient pas entre elles.
+    coherence_model: str = "sonnet"
+    coherence_effort: str = "high"
     # L'exploration qui precede la sequence. Sonnet a dessein : elle lit et
     # elle condense contre des documents qu'on lui a deja colles, ce n'est pas
     # un probleme de raisonnement.
