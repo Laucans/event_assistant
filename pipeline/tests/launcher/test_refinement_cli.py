@@ -32,6 +32,8 @@ KNOBS = (("REFINEMENT_GOAL_MODEL", "goal_model", RefinementConfig.goal_model),
          ("REFINEMENT_RULES_MODEL", "rules_model", RefinementConfig.rules_model),
          ("REFINEMENT_PLAN_MODEL", "plan_model", RefinementConfig.plan_model),
          ("REFINEMENT_ROUTER_MODEL", "router_model", RefinementConfig.router_model),
+         ("REFINEMENT_COHERENCE_MODEL", "coherence_model",
+          RefinementConfig.coherence_model),
          ("REFINEMENT_EXPLORE_MODEL", "explore_model",
           RefinementConfig.explore_model))
 
@@ -43,6 +45,8 @@ EFFORTS = (("REFINEMENT_GOAL_EFFORT", "goal_effort", RefinementConfig.goal_effor
            ("REFINEMENT_RULES_EFFORT", "rules_effort", RefinementConfig.rules_effort),
            ("REFINEMENT_PLAN_EFFORT", "plan_effort", RefinementConfig.plan_effort),
            ("REFINEMENT_ROUTER_EFFORT", "router_effort", RefinementConfig.router_effort),
+           ("REFINEMENT_COHERENCE_EFFORT", "coherence_effort",
+            RefinementConfig.coherence_effort),
            ("REFINEMENT_EXPLORE_EFFORT", "explore_effort",
             RefinementConfig.explore_effort))
 

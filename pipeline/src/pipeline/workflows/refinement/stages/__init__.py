@@ -6,7 +6,7 @@ corps, puis la publication — qui est une etape de la table sans etre une
 session.
 
 Une fonction de la config et non une table constante, comme la revue : chaque
-section a son modele, et les six sont reglables a l'appel.
+section a son modele, et les sept sont reglables a l'appel.
 """
 
 from __future__ import annotations
@@ -22,17 +22,22 @@ from pipeline.workflows.refinement.stages.business_goal import (
     BUSINESS_GOAL_PROMPT)
 from pipeline.workflows.refinement.stages.business_rules import (
     BUSINESS_RULES_PROMPT)
+from pipeline.workflows.refinement.stages.coherence import COHERENCE_PROMPT
 from pipeline.workflows.refinement.stages.router import ROUTER_PROMPT
 from pipeline.workflows.refinement.stages.technical import TECHNICAL_PROMPT
 from pipeline.workflows.refinement.stages.technical_plan import (
     TECHNICAL_PLAN_PROMPT)
 
 __all__ = ["ACCEPTANCE_CRITERIA_PROMPT", "BUSINESS_GOAL_PROMPT",
-           "BUSINESS_RULES_PROMPT", "PROMPTS", "ROUTER", "ROUTER_PROMPT",
+           "BUSINESS_RULES_PROMPT", "COHERENCE", "COHERENCE_PROMPT",
+           "PROMPTS", "ROUTER", "ROUTER_PROMPT",
            "TECHNICAL_PLAN_PROMPT", "TECHNICAL_PROMPT",
            "additional_context", "passes", "prompt_of"]
 
 ROUTER = gates.ROUTER
+# Definie dans `publish.py`, ou elle est aussi consommee : ce module importe
+# deja `publish`, et l'inverse ferait un cercle.
+COHERENCE = publish.COHERENCE
 PUBLISH = "publish"
 
 # Le prompt de chaque section, par cle de stage.
@@ -56,12 +61,18 @@ KNOBS: dict[str, tuple[str, str]] = {
 
 
 def passes(cfg) -> tuple:
-    """La carte, le routeur, les cinq sections, la publication — dans l'ordre.
+    """La carte, le routeur, les cinq sections, la coherence, la publication
+    — dans l'ordre.
 
-    Les deux entrees de tete etablissent ce que les six suivantes lisent :
+    Les deux entrees de tete etablissent ce que les sept suivantes lisent :
     une lecture gratuite du depot, puis la session qui la condense. Elles sont
     **dans la table** parce que la table est la sequence — et parce que leur
     sortie voyage par `ctx.results`, comme celle du routeur.
+
+    La coherence n'a pas de `skip` : au point ou la sequence l'atteint,
+    `state.wanted` est toujours non vide (les rounds 1 et 2 le fixent, et un
+    round route qui n'aurait rien nomme aurait deja echoue dans
+    `gates.router_named_sections`) — il n'y a jamais rien a sauter.
     """
     table: list = [
         *common.entries(cfg),
@@ -73,6 +84,7 @@ def passes(cfg) -> tuple:
         model, effort = KNOBS[key]
         table.append(StageSpec(key, getattr(cfg, model), getattr(cfg, effort),
                                skip=gates.section_is_wanted(key)))
+    table.append(StageSpec(COHERENCE, cfg.coherence_model, cfg.coherence_effort))
     table.append(Action(PUBLISH, publish.write, skip=gates.nothing_is_written))
     return tuple(table)
 
@@ -94,23 +106,35 @@ def prompt_of(step, ctx, state) -> str:
     """Le texte de cette etape.
 
     L'exploration a le sien : elle ne travaille pas une section du corps, elle
-    etablit ce que les six suivantes liront. `ground` ne passe pas par ici —
+    etablit ce que les sept suivantes liront. `ground` ne passe pas par ici —
     c'est une etape locale, et une etape locale n'a pas de prompt.
 
     La carte prefixe le texte de chaque section, elle n'est **pas** un champ
-    substitue dans le template : un `{repo_context}` que six templates
+    substitue dans le template : un `{repo_context}` que sept templates
     portaient chacun se serait tu en silence si l'un l'avait perdu, la ou un
     prefixe ne peut pas manquer. C'est aussi la forme qu'a deja
     `prompts.build` pour le bloc EXECUTION CONTEXT de la boucle — la carte est
     ce meme genre de bloc, pas un ingredient d'un prompt de section. Et en
-    tete, identique dans les six : c'est ce qui donne aux six sessions un
+    tete, identique dans les sept : c'est ce qui donne aux sept sessions un
     prefixe de cache commun, que le placer par template aurait casse.
+
+    Le `{body}` de la coherence n'est pas non plus celui des six autres : les
+    six recoivent le corps d'avant ce round (`issue.body`), fige a
+    `precheck` — la coherence recoit ce que ce round s'apprete a publier, le
+    merge de `state.found` et de ce que les sections viennent de rendre.
+    C'est la seule maniere pour elle de lire des sections que personne
+    d'autre, dans ce round, n'a lues ensemble.
     """
     if step.skill == common.SKILL:
         return common.prompt(ctx, state)
     cfg, issue = ctx.cfg, state.issue
-    template = (ROUTER_PROMPT if step.skill == ROUTER
-                else PROMPTS[step.skill])
+    if step.skill == COHERENCE:
+        template = COHERENCE_PROMPT
+        body = sections.render(
+            sections.merge(state.found, state.wanted, ctx.results))
+    else:
+        template = ROUTER_PROMPT if step.skill == ROUTER else PROMPTS[step.skill]
+        body = issue.body.strip() if issue is not None else ""
     said = prompts.fill(
         template,
         num=str(cfg.issue),
@@ -124,6 +148,5 @@ def prompt_of(step, ctx, state) -> str:
         said,
         title=issue.title if issue is not None else "",
         additional_context=additional_context(cfg.context),
-        body=((issue.body.strip() if issue is not None else "")
-              or prompts.EMPTY_BODY))
+        body=body or prompts.EMPTY_BODY)
     return common.repo_context(ctx) + "\n\n" + said

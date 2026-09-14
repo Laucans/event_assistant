@@ -29,7 +29,7 @@ FIELD = re.compile(r"\{[a-z_]+\}")
 ISSUE = Issue(number=25, title="Une task", state="open",
               body="## Business Goal\n\nLe but.\n")
 
-ALL_SKILLS = (stages.ROUTER,) + sections.KEYS
+ALL_SKILLS = (stages.ROUTER, stages.COHERENCE) + sections.KEYS
 
 
 def flat(text):
@@ -43,19 +43,29 @@ def flat(text):
 
 
 def built(skill, *, context="", round_no=2, issue=ISSUE, tmp_path=None,
-          repo_context=""):
-    """Le texte que ce stage recevrait, monte comme la sequence le monte."""
+          repo_context="", wanted=(), results=None):
+    """Le texte que ce stage recevrait, monte comme la sequence le monte.
+
+    `state.found` est pose comme `precheck` le poserait vraiment (le corps
+    de l'issue, parse) : aucun stage autre que la coherence ne le lit, mais
+    c'est ce dont la coherence a besoin pour montrer un `{body}` different du
+    corps brut — `wanted`/`results` simulent ce qu'un round a deja produit.
+    """
     cfg = RefinementConfig(issue=25, context=context,
                            workspace=Workspace(tmp_path or "/tmp"))
     state = refine.RefinementState()
     state.issue = issue
     state.round_no = round_no
-    # La carte voyage par `ctx.results`, sous le nom de l'etape qui l'a
-    # produite — comme la reponse du routeur et comme chaque section.
+    state.found = sections.parse(issue.body if issue is not None else "")
+    state.wanted = list(wanted)
+    # La carte et les sections du round voyagent par `ctx.results`, sous le
+    # nom de l'etape qui les a produites — comme la reponse du routeur.
+    all_results = dict(results or {})
+    if repo_context:
+        all_results[common.SKILL] = types.SimpleNamespace(text=repo_context)
     ctx = types.SimpleNamespace(
         cfg=cfg, log_dir=Path(tmp_path or "/tmp"), round_no=round_no,
-        results=({common.SKILL: types.SimpleNamespace(text=repo_context)}
-                 if repo_context else {}))
+        results=all_results)
     return stages.prompt_of(types.SimpleNamespace(skill=skill), ctx, state)
 
 
@@ -67,7 +77,7 @@ def test_the_sequence_is_the_router_the_five_sections_then_the_publication():
     assert [step.skill for step in stages.passes(cfg)] == [
         "ground", "explore",
         "router", "business-goal", "technical", "acceptance-criteria",
-        "business-rules", "technical-plan", "publish"]
+        "business-rules", "technical-plan", "coherence", "publish"]
 
 
 def test_the_sections_run_in_the_order_the_body_is_written_in():
@@ -244,19 +254,27 @@ def test_a_context_that_names_a_field_is_not_a_second_substitution(key):
 # copies : sept a quinze tours par section, dont la moitie a s'orienter.
 
 
+def template_of(skill):
+    """Le texte non monte de ce stage — `ROUTER`/`COHERENCE` n'ont pas de
+    section dans `stages.PROMPTS`, qui n'indexe que les cinq sections."""
+    if skill == stages.ROUTER:
+        return stages.ROUTER_PROMPT
+    if skill == stages.COHERENCE:
+        return stages.COHERENCE_PROMPT
+    return stages.PROMPTS[skill]
+
+
 @pytest.mark.parametrize("skill", ALL_SKILLS)
 def test_no_template_carries_the_repo_context_placeholder(skill):
     """La carte prefixe le texte monte, elle n'est pas un champ substitue :
-    un `{repo_context}` que six templates auraient porte chacun se serait tu
+    un `{repo_context}` que sept templates auraient porte chacun se serait tu
     en silence si l'un l'avait perdu, la ou un prefixe ne peut pas manquer."""
-    template = (stages.ROUTER_PROMPT if skill == stages.ROUTER
-                else stages.PROMPTS[skill])
-    assert "{repo_context}" not in template
+    assert "{repo_context}" not in template_of(skill)
 
 
 @pytest.mark.parametrize("skill", ALL_SKILLS)
 def test_every_stage_opens_on_the_repo_map_identically(skill):
-    """En tete, et identique partout : c'est ce qui donne aux six sessions un
+    """En tete, et identique partout : c'est ce qui donne aux sept sessions un
     prefixe de cache commun. L'hypothese se verifie sur `cache_write` dans
     .llocal/refinement/costs.tsv — la place, elle, ne coute rien."""
     assert built(skill).startswith(common.UNMAPPED)
@@ -269,9 +287,7 @@ def test_no_template_still_sends_a_section_reading_the_documents(skill):
     """Une carte **ajoutee** pendant que la consigne reste augmente le cout au
     lieu de le reduire : elle s'ajoute a l'exploration au lieu de la
     remplacer."""
-    template = (stages.ROUTER_PROMPT if skill == stages.ROUTER
-                else stages.PROMPTS[skill])
-    said = flat(template)
+    said = flat(template_of(skill))
     assert "Ground what you write in the repository" not in said
     assert "Read whatever you need" not in said
     assert "Read the repository if you need" not in said
@@ -311,3 +327,33 @@ def test_the_map_does_not_turn_the_router_on():
     assert cfg.context == ""
     assert not rounds.routed(3, bool(cfg.context))
     assert gates.router_is_off(ctx, state).value, "le routeur s'est allume"
+
+
+# --- la coherence : le corps qu'elle recoit ---------------------------------
+#
+# Les six autres stages recoivent `issue.body`, fige a `precheck`. La
+# coherence recoit ce que ce round s'apprete a publier — sinon elle relirait
+# exactement ce que chaque section a deja lu, sans jamais voir ce qu'elles
+# viennent d'ecrire.
+
+
+def test_coherence_sees_this_rounds_fresh_sections_not_just_the_old_body():
+    said = built(stages.COHERENCE, wanted=["technical"],
+                 results={"technical": types.SimpleNamespace(
+                     text="La technique retouchee.")})
+    assert "La technique retouchee." in said
+
+
+def test_coherence_still_carries_a_section_this_round_did_not_touch():
+    issue = Issue(number=25, title="Une task", state="open",
+                  body="## Business Goal\n\nLe but.\n\n"
+                       "## Technical\n\nLa technique.\n")
+    said = built(stages.COHERENCE, issue=issue, wanted=["technical"],
+                 results={"technical": types.SimpleNamespace(
+                     text="La technique retouchee.")})
+    assert "Le but." in said
+    assert "La technique retouchee." in said
+
+
+def test_coherence_is_told_not_to_drop_or_rename_a_heading():
+    assert "Do not drop a section" in flat(built(stages.COHERENCE))
